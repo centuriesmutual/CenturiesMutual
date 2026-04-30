@@ -127,7 +127,7 @@ export function CommunityHero() {
                   fill
                   priority={false}
                   sizes="(max-width: 1023px) 100vw, 42vw"
-                  className="object-cover object-[50%_30%]"
+                  className="object-cover object-[50%_5%] scale-[1.55] origin-top"
                 />
               </div>
               <div
