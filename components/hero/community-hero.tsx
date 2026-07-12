@@ -117,7 +117,7 @@ export function CommunityHero() {
                 >
                   The Unexcelled Steward
                 </h2>
-                <p className="mb-5 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#3d4a41] sm:text-[0.9375rem]">
+                <p className="mb-2 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#3d4a41] sm:text-[0.9375rem]">
                   Exclusive health insurance for your community, with coverage,
                   member rewards, and care access in one place.
                 </p>

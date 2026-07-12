@@ -3,7 +3,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { motion, useMotionValueEvent, useScroll } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'framer-motion'
 import { Fraunces } from 'next/font/google'
 import { cn } from '@/lib/utils'
 
@@ -99,12 +100,7 @@ export function SiteHeader() {
             </Link>
 
             <div className="relative z-[1] flex shrink-0 items-center gap-3 sm:gap-4">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-[#FAFCFB] px-3 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E] no-underline shadow-sm transition hover:bg-white sm:px-4 sm:text-[10px] sm:tracking-[0.14em]"
-              >
-                Client Portal
-              </Link>
+              <ClientPortalButton />
             </div>
           </div>
         </header>
@@ -112,5 +108,65 @@ export function SiteHeader() {
 
       <div aria-hidden className="m-0 block shrink-0 bg-[#0F3D2E] p-0 leading-none" style={{ height: spacerHeight }} />
     </div>
+  )
+}
+
+function ClientPortalButton() {
+  const router = useRouter()
+  const [transitioning, setTransitioning] = useState(false)
+
+  const go = () => {
+    if (transitioning) return
+    setTransitioning(true)
+  }
+
+  return (
+    <>
+      <motion.button
+        type="button"
+        onClick={go}
+        whileHover={{ scale: 1.03, y: -1 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+        className="inline-flex items-center justify-center rounded-[10px] border-0 bg-[#FAFCFB] px-3 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E] shadow-sm sm:px-4 sm:text-[10px] sm:tracking-[0.14em]"
+      >
+        Client Portal
+      </motion.button>
+
+      <AnimatePresence>
+        {transitioning ? (
+          <motion.div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0F3D2E]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            onAnimationComplete={() => {
+              router.push('/wallet')
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.08, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="text-center"
+            >
+              <p className="m-0 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
+                Client Portal
+              </p>
+              <p
+                className="mt-2 font-medium text-[#FAF7F0]"
+                style={{
+                  fontFamily: 'var(--font-fraunces), Fraunces, Georgia, serif',
+                  fontSize: '1.35rem',
+                }}
+              >
+                Opening your feed…
+              </p>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </>
   )
 }

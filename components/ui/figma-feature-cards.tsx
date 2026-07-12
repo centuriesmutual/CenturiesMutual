@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import type { ComponentType, SVGProps, ReactNode } from 'react'
+import Link from 'next/link'
 import { staggerContainer, staggerItem } from '@/utils/home-animations'
 
 type Feature = {
@@ -56,36 +57,63 @@ export function UnifiedBenefitCard({
   title,
   body,
   points,
+  action,
   className = '',
+  titleClassName = '',
 }: {
   eyebrow?: string
   title: string
   body: ReactNode
   points?: ReadonlyArray<string>
+  action?: { label: string; href: string; external?: boolean }
   className?: string
+  titleClassName?: string
 }) {
   return (
     <motion.div
-      className={`rounded-2xl bg-[#14432A]/[0.06] p-5 sm:p-6 lg:p-7 ${className}`}
+      className={`relative flex flex-col rounded-2xl bg-[#14432A]/[0.06] p-5 sm:p-6 lg:p-7 ${className}`}
       initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-50px' }}
       transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
     >
-      {eyebrow ? (
-        <p className="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C9A53E]">
-          {eyebrow}
-        </p>
-      ) : null}
-      <h3
-        className="mb-3 font-medium leading-snug tracking-[-0.01em] text-[#14432A]"
-        style={{
-          fontFamily: "'Playfair Display', Georgia, serif",
-          fontSize: 'clamp(1.35rem, 2.4vw, 1.65rem)',
-        }}
-      >
-        {title}
-      </h3>
+      <div className="min-w-0">
+        {eyebrow ? (
+          <p className="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C9A53E]">
+            {eyebrow}
+          </p>
+        ) : null}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3
+            className={`m-0 min-w-0 font-medium leading-snug tracking-[-0.01em] text-[#14432A] ${titleClassName}`}
+            style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              fontSize: titleClassName ? undefined : 'clamp(1.35rem, 2.4vw, 1.65rem)',
+            }}
+          >
+            {title}
+          </h3>
+          {action ? (
+            action.external ? (
+              <a
+                href={action.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center justify-center self-center rounded-[10px] bg-[#0F3D2E] px-4 py-2 font-sans text-[0.8125rem] font-semibold text-[#FAFCFB] no-underline transition hover:bg-[#0A2E22]"
+              >
+                {action.label}
+              </a>
+            ) : (
+              <Link
+                href={action.href}
+                className="inline-flex shrink-0 items-center justify-center self-center rounded-[10px] bg-[#0F3D2E] px-4 py-2 font-sans text-[0.8125rem] font-semibold text-[#FAFCFB] no-underline transition hover:bg-[#0A2E22]"
+              >
+                {action.label}
+              </Link>
+            )
+          ) : null}
+        </div>
+      </div>
       <div className="font-sans text-[0.9375rem] leading-[1.65] text-[#55655D]">{body}</div>
       {points && points.length > 0 ? (
         <ul className="mt-3 space-y-2 border-t border-[#14432A]/10 pt-3">

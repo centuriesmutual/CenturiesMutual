@@ -37,15 +37,17 @@ export default function Login() {
     setError(null)
 
     try {
-      // Hand off to Auth0 Universal Login. Email is passed as a hint so
-      // Auth0 can pre-fill the field; the actual credential check happens
-      // on the Auth0 hosted page.
-      const params = new URLSearchParams()
-      params.set('returnTo', 'https://block.centuriesmutual.com')
-      if (formData.email) {
-        params.set('login_hint', formData.email)
+      const username = formData.email.trim() || 'member'
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(
+          'cm_member_session',
+          JSON.stringify({
+            username,
+            loggedInAt: new Date().toISOString(),
+          }),
+        )
       }
-      window.location.href = `/api/auth/login?${params.toString()}`
+      window.location.href = '/wallet'
     } catch {
       setError('An error occurred during login. Please try again.')
       setIsSubmitting(false)
@@ -107,17 +109,18 @@ export default function Login() {
                 <form onSubmit={handleLogin}>
                   <div className="mb-3">
                     <label htmlFor="email" className="form-label small text-muted">
-                      Email Address
+                      Username or Email
                     </label>
                     <input
-                      type="email"
+                      type="text"
                       className="form-control"
                       id="email"
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      placeholder="Enter your email"
+                      placeholder="Enter username or email"
                       required
+                      autoComplete="username"
                       style={{
                         borderColor: '#e9ecef',
                         fontSize: '1rem',

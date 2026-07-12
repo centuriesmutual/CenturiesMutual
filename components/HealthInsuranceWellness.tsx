@@ -66,6 +66,10 @@ export default function HealthInsuranceWellness() {
                 'Health progress connects without a second login',
                 'Eligible activity can unlock wallet credits',
               ]}
+              action={{
+                label: 'My Brothers Keeper',
+                href: '/my-brothers-keeper',
+              }}
             />
           </motion.div>
 

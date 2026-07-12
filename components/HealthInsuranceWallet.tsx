@@ -61,9 +61,9 @@ export default function HealthInsuranceWallet() {
                 </p>
               }
               points={[
-                'Link the wallet to your membership in one step',
+                'Link the wallet to your membership',
                 'Earn rewards when you do everyday eligible activities',
-                'See every credit listed with the date it was earned',
+                'Watch compounding interest grow on eligible balances over time',
                 'Only you can use or move your rewards',
               ]}
             />

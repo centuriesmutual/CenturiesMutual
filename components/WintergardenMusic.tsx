@@ -50,7 +50,8 @@ export default function WintergardenMusic() {
           <motion.div {...slideInLeft}>
             <UnifiedBenefitCard
               eyebrow="Main Ticket"
-              title="Rehearse, perform, and level up"
+              title="Rehearse. Perform. Level Up"
+              titleClassName="whitespace-nowrap text-[1.15rem] sm:text-[1.25rem] lg:text-[1.35rem]"
               body={
                 <p className="m-0">
                   Enter a session, play through guided repertoire, and earn
@@ -66,6 +67,7 @@ export default function WintergardenMusic() {
                 'Progressive challenges that build repertoire and stamina',
                 'Progress stays linked to your Centuries Mutual member profile',
               ]}
+              action={{ label: 'Wintergarden', href: '/wintergarden' }}
             />
           </motion.div>
 
