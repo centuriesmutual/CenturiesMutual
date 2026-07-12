@@ -1,26 +1,26 @@
 import type { Metadata } from 'next'
 
 const description =
-  'Centuries Mutual sells exclusive health insurance for members — plans, rewards wallet, rent and bill pay, wellness through My Brother’s Keeper, Wintergarden music performance, and member-only compounding in one brokerage.'
+  'Your Community Brokerage: A healthcare rewards network that empowers individuals, families, and employers through supplemental wellness initiatives focused on fitness, nutrition, preventive care, and music performance. Powered by blockchain technology, the platform securely tracks participation, verifies achievements, and delivers transparent rewards and incentives that encourage healthier lifestyles while strengthening community engagement.'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://centuriesmutual.com'),
   title: {
-    default: 'Centuries Mutual | Exclusive Health Insurance Membership',
+    default: 'Centuries Mutual',
     template: '%s | Centuries Mutual',
   },
   description,
   keywords: [
-    'health insurance',
     'Centuries Mutual',
-    'exclusive health insurance',
-    'member rewards',
-    'healthcare wallet',
-    'individual family plans',
-    'Dallas Texas insurance brokerage',
-    'My Brother’s Keeper',
-    'Wintergarden',
-    'member compounding',
+    'community brokerage',
+    'healthcare rewards',
+    'wellness',
+    'fitness',
+    'nutrition',
+    'preventive care',
+    'music performance',
+    'blockchain rewards',
+    'Dallas Texas',
   ],
   authors: [{ name: 'Centuries Mutual' }],
   creator: 'Centuries Mutual',
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://centuriesmutual.com',
     siteName: 'Centuries Mutual',
-    title: 'Centuries Mutual | Exclusive Health Insurance Membership',
+    title: 'Centuries Mutual',
     description,
     images: [
       {
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Centuries Mutual | Exclusive Health Insurance Membership',
+    title: 'Centuries Mutual',
     description,
     images: ['/cmlogotreesmall-removebg-preview.png'],
   },
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
   other: {
     'application/ld+json': JSON.stringify({
       '@context': 'https://schema.org',
-      '@type': 'InsuranceAgency',
+      '@type': 'Organization',
       name: 'Centuries Mutual',
       url: 'https://centuriesmutual.com',
       logo: 'https://centuriesmutual.com/cmlogotreesmall-removebg-preview.png',
@@ -77,71 +77,6 @@ export const metadata: Metadata = {
         addressLocality: 'Dallas',
         addressRegion: 'TX',
         addressCountry: 'US',
-      },
-      areaServed: {
-        '@type': 'Country',
-        name: 'United States',
-      },
-      sameAs: [
-        'https://centuriesmutual.com/individual-family-services',
-        'https://centuriesmutual.com/enrollment',
-        'https://centuriesmutual.com/downloads',
-        'https://centuriesmutual.com/help-desk',
-        'https://mybrotherskeeper.cc',
-      ],
-      hasOfferCatalog: {
-        '@type': 'OfferCatalog',
-        name: 'Centuries Mutual Member Services',
-        itemListElement: [
-          {
-            '@type': 'Offer',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Exclusive Health Insurance',
-              url: 'https://centuriesmutual.com/individual-family-services',
-            },
-          },
-          {
-            '@type': 'Offer',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Healthcare Rewards Wallet',
-              url: 'https://centuriesmutual.com/treasury',
-            },
-          },
-          {
-            '@type': 'Offer',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Rent, Bills & Groceries Pay',
-              url: 'https://centuriesmutual.com/pay',
-            },
-          },
-          {
-            '@type': 'Offer',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Fitness & Wellness via My Brother’s Keeper',
-              url: 'https://centuriesmutual.com/my-brothers-keeper',
-            },
-          },
-          {
-            '@type': 'Offer',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Wintergarden Music Performance',
-              url: 'https://centuriesmutual.com/wintergarden',
-            },
-          },
-          {
-            '@type': 'Offer',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Member-Only Compounding',
-              url: 'https://centuriesmutual.com/rentalequity',
-            },
-          },
-        ],
       },
     }),
   },

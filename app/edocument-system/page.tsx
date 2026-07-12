@@ -55,7 +55,7 @@ export default function EDocumentSystem() {
                 </p>
                 <div className="d-flex gap-3 flex-wrap">
                   <Link 
-                    href="/edocuments-audit-tracking" 
+                    href="/forms" 
                     className="btn btn-primary btn-lg px-4 py-3 fw-bold"
                     style={{ 
                       borderRadius: '12px',

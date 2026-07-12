@@ -33,7 +33,7 @@ export default function HealthInsuranceWellness() {
           transition={{ duration: 1.15, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
-            — Health Insurance Wellness
+            — Fitness &amp; Wellness
           </p>
           <h2
             className="mb-3 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"
@@ -42,21 +42,8 @@ export default function HealthInsuranceWellness() {
               fontSize: 'clamp(1.75rem, 4.2vw, 3rem)',
             }}
           >
-            Fitness via My Brother&apos;s Keeper
+            My Brother&apos;s Keeper
           </h2>
-          <p className="mx-auto max-w-[640px] font-sans text-[0.9375rem] leading-[1.6] text-[#55655D] sm:text-[1.0625rem]">
-            Connect your fitness activity through{' '}
-            <a
-              href="https://mybrotherskeeper.cc"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-[#14432A] underline decoration-[#C9A53E]/60 underline-offset-2 hover:decoration-[#C9A53E]"
-            >
-              mybrotherskeeper.cc
-            </a>
-            — workouts sync into your Centuries Mutual health insurance membership
-            so healthy habits can feed your member rewards.
-          </p>
         </motion.div>
 
         <div className="mt-8 grid grid-cols-1 items-center gap-8 sm:mt-10 lg:mt-12 lg:grid-cols-2 lg:gap-10">

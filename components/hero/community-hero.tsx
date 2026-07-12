@@ -86,14 +86,17 @@ export function CommunityHero() {
             animate="show"
             className="relative z-[1] flex flex-1 flex-col justify-center px-5 py-7 sm:px-8 sm:py-8 lg:px-12 lg:py-12"
           >
-            <p className="mb-3 font-sans text-[10px] font-semibold uppercase tracking-[0.25em] text-[#C9A961] sm:mb-4">
-              Centuries Mutual
+            <p className="mb-3 font-sans text-[10px] font-medium uppercase tracking-[0.25em] text-[#C9A961] sm:mb-4">
+              — Est. 2024
             </p>
 
             <div
               className={`relative overflow-hidden rounded-2xl border border-[#E5E0D5] bg-[#F7F3EE] ${portalShadow}`}
             >
               <div className="relative z-[1] px-5 py-6 sm:px-8 sm:py-8">
+                <p className="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C9A961]">
+                  Centuries Mutual
+                </p>
                 <h1
                   className="mb-3 max-w-md font-medium tracking-tight text-[#0F3D2E]"
                   style={{
@@ -112,13 +115,13 @@ export function CommunityHero() {
                     lineHeight: 1.3,
                   }}
                 >
-                  Unexcelled Stewardship
+                  The Unexcelled Steward
                 </h2>
                 <p className="mb-5 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#3d4a41] sm:text-[0.9375rem]">
-                  Download the Centuries Mutual app for exclusive health insurance —
-                  plans, member rewards, and care access in one place.
+                  Exclusive health insurance for your community — coverage,
+                  member rewards, and care access under one brokerage.
                 </p>
-                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:flex-nowrap">
                   <Link
                     href="/downloads"
                     className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0F3D2E] px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] no-underline"
@@ -126,10 +129,10 @@ export function CommunityHero() {
                     Download App
                   </Link>
                   <Link
-                    href="/individual-family-services"
+                    href="/create-account"
                     className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[#0F3D2E] bg-transparent px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] no-underline"
                   >
-                    Learn More
+                    Create Account
                   </Link>
                 </div>
               </div>

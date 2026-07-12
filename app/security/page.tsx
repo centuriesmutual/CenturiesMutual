@@ -36,8 +36,8 @@ export default function SecurityPage() {
                   blockchain tools, and community network.
                 </p>
                 <div className="d-flex flex-wrap gap-3">
-                  <Link href="/in-house-security" className="btn btn-light btn-lg px-4 py-3">
-                    In-house systems
+                  <Link href="/audit-compliance" className="btn btn-light btn-lg px-4 py-3">
+                    Audit &amp; compliance
                   </Link>
                   <Link href="/learnmore/security-system" className="btn btn-outline-light btn-lg px-4 py-3">
                     Technical overview
@@ -135,8 +135,8 @@ export default function SecurityPage() {
                   Beyond software, Centuries Mutual designs and manufactures select security hardware for environments that need 
                   bespoke cameras, firmware, and fleet management—ideal for properties and operations that want one accountable partner.
                 </p>
-                <Link href="/in-house-security" className="btn btn-lg px-4 py-3 text-white fw-semibold" style={{ background: '#14432A', borderColor: '#14432A' }}>
-                  Explore in-house security
+                <Link href="/audit-compliance" className="btn btn-lg px-4 py-3 text-white fw-semibold" style={{ background: '#14432A', borderColor: '#14432A' }}>
+                  Explore audit &amp; compliance
                 </Link>
               </div>
               <div className="col-lg-6 order-lg-1">

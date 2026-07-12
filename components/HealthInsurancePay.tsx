@@ -28,7 +28,7 @@ export default function HealthInsurancePay() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div className="mx-auto max-w-3xl text-center" {...sectionAnimation}>
           <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
-            — Health Insurance Pay
+            — Healthcare Rewards
           </p>
           <h2
             className="mb-3 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"

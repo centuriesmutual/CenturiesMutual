@@ -16,12 +16,11 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
   {
     title: 'Insurance',
     links: [
-      { href: '/individual-family-services', label: 'Individual & Family Plans' },
-      { href: '/enrollment', label: 'Enrollment' },
-      { href: '/claims', label: 'File a Claim' },
-      { href: '/claims-disputes', label: 'Claims & Disputes' },
-      { href: '/child-care', label: 'Dependent Care' },
-      { href: '/downloads', label: 'Download the App' },
+      { href: '/individual-family-services', label: 'Individual & Family' },
+      { href: '/medicare-supplement', label: 'Medicare Supplement' },
+      { href: '/medicare-advantage', label: 'Medicare Advantage' },
+      { href: '/group-plans', label: 'Group Plans' },
+      { href: '/dental', label: 'Dental' },
     ],
   },
   {
@@ -30,35 +29,24 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
       { href: '/treasury', label: 'Rewards Wallet' },
       { href: '/pay', label: 'Rent, Bills & Groceries' },
       { href: '/rentalequity', label: 'Compound Earnings' },
-      { href: '/my-brothers-keeper', label: 'Fitness & Wellness' },
-      { href: '/shop', label: 'Member Shop' },
       { href: '/utilities', label: 'Utilities' },
     ],
   },
   {
-    title: 'Member Hub',
+    title: 'Neighborhood',
     links: [
-      { href: '/login', label: 'Member Login' },
-      { href: '/signup', label: 'Create Account' },
-      { href: '/treasury', label: 'Treasury' },
-      { href: '/documents', label: 'Member Documents' },
-      { href: '/edocument-system', label: 'eDocument System' },
-      { href: '/newspaper', label: 'Member Newspaper' },
-      { href: '/neighborhood', label: 'Neighborhood' },
-      { href: '/network', label: 'Member Network' },
+      { href: '/newspaper', label: 'Newspaper' },
+      { href: '/wintergarden', label: 'Wintergarden' },
+      { href: '/my-brothers-keeper', label: 'My Brothers Keeper' },
     ],
   },
   {
-    title: 'Trust & Technology',
+    title: 'Documents',
     links: [
-      { href: '/trust-system', label: 'Trust System' },
-      { href: '/trustscore', label: 'Trust Score' },
-      { href: '/security', label: 'Security' },
-      { href: '/in-house-security', label: 'In-House Security' },
-      { href: '/audit-compliance', label: 'Audit & Compliance' },
-      { href: '/edocuments-audit-tracking', label: 'Audit Tracking' },
-      { href: '/ai-powered-technology', label: 'AI Technology' },
-      { href: '/blockchain', label: 'Blockchain Ledger' },
+      { href: '/forms', label: 'Forms' },
+      { href: '/taxes', label: 'Taxes' },
+      { href: '/find-a-doctor', label: 'Find a Provider' },
+      { href: '/carrier-portal', label: 'Carrier Portal' },
     ],
   },
   {
@@ -66,9 +54,8 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
     links: [
       { href: '/help-desk', label: 'Help Desk' },
       { href: '/legal', label: 'Legal' },
-      { href: '/private-phone-messaging', label: 'Secure Messaging' },
-      { href: '/search', label: 'Site Search' },
-      { href: 'https://mybrotherskeeper.cc', label: "My Brother's Keeper", external: true },
+      { href: '/developers', label: 'Developers' },
+      { href: '/investor-relations', label: 'Investor Relations' },
     ],
   },
 ]
@@ -217,7 +204,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="mb-3 text-white/75" style={{ fontSize: '0.95rem', lineHeight: 1.65, maxWidth: 320 }}>
-              Providing a comprehensive brokerage network to further a secure a
+              Providing a comprehensive brokerage network to further a secure and
               better future.
             </p>
             <div className="d-flex align-items-center text-white mb-3" style={{ opacity: 0.8 }}>
@@ -256,44 +243,19 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Partners strip */}
+        {/* Legal disclaimer */}
         <div className="mt-5 rounded-3 border border-white/10 bg-white/[0.03] px-4 py-4">
-          <p className="cm-footer-heading mb-3">Partners</p>
-          <div className="d-flex flex-wrap gap-x-4 gap-y-2">
-            {[
-              { href: '/individual-family-services', label: 'Intuit' },
-              { href: '/treasury', label: 'HealthEquity' },
-              { href: '/pay', label: 'WEX' },
-              { href: '/claims', label: 'CVS' },
-              { href: '/claims', label: 'Walgreens' },
-              { href: '/shop', label: 'Amazon' },
-              {
-                href: 'https://mybrotherskeeper.cc',
-                label: "My Brother's Keeper",
-                external: true,
-              },
-            ].map((partner) =>
-              partner.external ? (
-                <a
-                  key={partner.label}
-                  href={partner.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-sans text-[0.8125rem] text-white/70 text-decoration-none hover:text-white"
-                >
-                  {partner.label}
-                </a>
-              ) : (
-                <Link
-                  key={partner.label}
-                  href={partner.href}
-                  className="font-sans text-[0.8125rem] text-white/70 text-decoration-none hover:text-white"
-                >
-                  {partner.label}
-                </Link>
-              ),
-            )}
-          </div>
+          <p className="cm-footer-heading mb-3">Legal disclaimer</p>
+          <p className="mb-0 font-sans text-[0.8125rem] leading-[1.65] text-white/65">
+            Centuries Mutual is an insurance brokerage and healthcare rewards network.
+            Coverage, premiums, and rewards vary by eligibility, geography, and
+            underwriting and are governed solely by applicable plan documents and law.
+            Wellness, fitness, nutrition, and performance programs are supplemental and
+            are not medical advice or clinical care. Third-party marks belong to their
+            owners; appearance does not imply affiliation beyond stated relationships.
+            This website is not an offer of securities, tax advice, or a guarantee of
+            any outcome.
+          </p>
         </div>
       </div>
 
@@ -318,11 +280,9 @@ export default function Footer() {
             </ul>
           </div>
           <p className="mt-3 mb-0 text-white/35" style={{ fontSize: '0.7rem', lineHeight: 1.55, maxWidth: 920 }}>
-            Centuries Mutual provides exclusive health insurance brokerage and member
-            services. Product availability, benefits, and rewards may vary by plan,
-            eligibility, and jurisdiction. Partner names are trademarks of their
-            respective owners and do not imply endorsement beyond stated program
-            relationships.
+            © Centuries Mutual. All product names, logos, and brands are property of
+            their respective owners. Coverage and rewards are subject to plan documents
+            and applicable law.
           </p>
         </div>
       </div>

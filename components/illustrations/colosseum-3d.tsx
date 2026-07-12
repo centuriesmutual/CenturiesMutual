@@ -195,8 +195,8 @@ function AtticBand({ radius, y, height }: { radius: number; y: number; height: n
   )
 }
 
-/** Warm tan grounding shadow — radial gradient, never gray. */
-function WarmShadow({ y, radius }: { y: number; radius: number }) {
+/** Soft drop shadow under the monument — visible on the transparent canvas. */
+function GroundShadow() {
   const texture = useMemo(() => {
     const size = 256
     const canvas = document.createElement('canvas')
@@ -204,9 +204,10 @@ function WarmShadow({ y, radius }: { y: number; radius: number }) {
     canvas.height = size
     const ctx = canvas.getContext('2d')!
     const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-    grad.addColorStop(0, 'rgba(148, 122, 74, 0.42)')
-    grad.addColorStop(0.55, 'rgba(160, 136, 90, 0.24)')
-    grad.addColorStop(1, 'rgba(170, 148, 104, 0)')
+    grad.addColorStop(0, 'rgba(90, 72, 42, 0.38)')
+    grad.addColorStop(0.4, 'rgba(110, 90, 55, 0.22)')
+    grad.addColorStop(0.75, 'rgba(130, 108, 70, 0.08)')
+    grad.addColorStop(1, 'rgba(130, 108, 70, 0)')
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, size, size)
     const tex = new THREE.CanvasTexture(canvas)
@@ -214,8 +215,8 @@ function WarmShadow({ y, radius }: { y: number; radius: number }) {
     return tex
   }, [])
   return (
-    <mesh position={[0, y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[radius * 2, radius * 2]} />
+    <mesh position={[0, -1.15, 0.15]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[7.2, 6.2]} />
       <meshBasicMaterial map={texture} transparent depthWrite={false} />
     </mesh>
   )
@@ -387,13 +388,8 @@ function Colosseum() {
   }, [invalidate])
 
   return (
-    <group ref={groupRef} position={[0, -0.12, 0]} rotation={[0.05, 0.5, 0]} scale={0.84}>
-      {/* Ground plinth — warm tan, no gray */}
-      <mesh position={[0, -0.66, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[3.0, 72]} />
-        <meshStandardMaterial color="#E9DAB2" metalness={0.02} roughness={0.95} />
-      </mesh>
-      <WarmShadow y={-0.652} radius={2.7} />
+    <group ref={groupRef} position={[0, -0.32, 0]} rotation={[0.05, 0.5, 0]} scale={0.84}>
+      {/* Stone base ring under the outer wall */}
       <mesh position={[0, -0.62, 0]}>
         <cylinderGeometry args={[2.35, 2.42, 0.08, 72]} />
         <meshStandardMaterial color="#D9C89D" metalness={0.03} roughness={0.9} />
@@ -451,13 +447,14 @@ function Scene() {
       <directionalLight position={[0, 4, 0]} intensity={0.55} color="#FFF2D8" />
       <directionalLight position={[0, 2, 7]} intensity={0.3} color={GOLD} />
       <Colosseum />
+      <GroundShadow />
       <ContactShadows
-        position={[0, -0.98, 0]}
-        opacity={0.28}
-        scale={12}
-        blur={2.6}
+        position={[0, -1.18, 0]}
+        opacity={0.32}
+        scale={11}
+        blur={2.8}
         far={5}
-        color="#7A6540"
+        color="#6B5535"
       />
       <Environment preset="sunset" />
     </>

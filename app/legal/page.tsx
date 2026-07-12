@@ -1,208 +1,188 @@
-'use client'
-
-import Navbar from '../../components/Navbar'
-import Footer from '../../components/Footer'
+import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ImmersivePage } from '@/components/immersive/immersive-page'
+
+export const metadata: Metadata = {
+  title: 'Legal',
+  description:
+    'Centuries Mutual Legal center — terms of service, privacy policy, member agreements, disclaimers, and regulatory notices.',
+}
 
 export default function LegalPage() {
   return (
-    <>
-      <Navbar />
-      <main>
-        <section className="py-5" style={{ 
-          background: 'linear-gradient(135deg, #14432A 0%, #206542 100%)',
-          color: 'white'
-        }}>
-          <div className="container py-4">
-            <h1 className="display-5 fw-bold mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Legal
-            </h1>
-            <p className="lead mb-0" style={{ maxWidth: '720px', opacity: 0.95 }}>
-              Policies that govern use of Centuries Mutual websites, apps, and brokerage-related services—including 
-              blockchain-backed tools, network features, and secure communications.
+    <ImmersivePage
+      eyebrow="— Legal"
+      title="Legal Center"
+      lead="Policies that govern Centuries Mutual websites, apps, brokerage services, rewards, and supplemental member programs. Read the summaries below, then the full terms and privacy sections. By using our services you agree to these terms; questions go to Help Desk."
+      ctaLabel="Contact Help Desk"
+      ctaHref="/help-desk"
+      secondaryLabel="Privacy highlights"
+      secondaryHref="#privacy"
+      sections={[
+        {
+          eyebrow: '01 Scope',
+          title: 'What these policies cover',
+          body: 'These terms apply to members, applicants, visitors, developers, and partners who access Centuries Mutual websites, mobile applications, rewards wallets, wellness apps (including My Brothers Keeper), Wintergarden, document tools, and related brokerage services. If you do not agree, do not use the services.',
+          points: [
+            'Websites, apps, and member hub tools',
+            'Insurance brokerage and enrollment pathways',
+            'Rewards, pay, wellness, and performance programs',
+            'Developer and partner integrations',
+          ],
+        },
+        {
+          eyebrow: '02 Terms',
+          title: 'Core terms of service',
+          body: 'You must be legally able to contract in your jurisdiction. Keep credentials confidential and provide accurate information. Do not misuse the services — no fraud, harassment, unlawful activity, scraping that violates our rules, or circumvention of security. We may modify or discontinue features with notice where required by law.',
+          points: [
+            'Binding agreement upon access or account creation',
+            'Account responsibility and accurate profile data',
+            'Prohibited misuse and interference with systems',
+            'Feature changes with notice where legally required',
+          ],
+          tone: 'cream',
+        },
+        {
+          eyebrow: '03 Coverage reality',
+          title: 'Insurance is governed by plan documents',
+          body: 'Marketing copy on this site does not create coverage. Benefits, premiums, networks, and eligibility are defined solely by applicable plan documents, carrier contracts, and law. Availability varies by geography and underwriting. Nothing on the website guarantees issuance, savings, or claim outcomes.',
+          points: [
+            'Plan documents control over website copy',
+            'Eligibility, geography, and underwriting gates',
+            'No guarantee of coverage or claim payment',
+            'Licensed channels required for insurance advice',
+          ],
+        },
+        {
+          eyebrow: '04 Rewards & programs',
+          title: 'Supplemental initiatives',
+          body: 'Healthcare rewards, fitness, nutrition, preventive prompts, and Wintergarden music-performance software are supplemental member initiatives. They are not medical advice, not clinical care, and not a substitute for professional treatment. Reward amounts and eligibility can change under published program rules.',
+          points: [
+            'Not medical advice or covered clinical care',
+            'Rewards subject to eligibility and program rules',
+            'Programs may be modified or ended with notice',
+            'Blockchain may verify participation where disclosed',
+          ],
+          tone: 'cream',
+        },
+        {
+          eyebrow: '05 Privacy',
+          title: 'How we handle personal data',
+          body: 'We collect account, contact, usage, and service data needed to operate brokerage, rewards, and member tools. We share data with carriers, processors, and partners only as needed to deliver the service or as required by law. You may request access or correction through Help Desk. See the full privacy section below for detail.',
+          points: [
+            'Collection limited to operating the services',
+            'Processors and carriers under appropriate agreements',
+            'Security controls described in our security surfaces',
+            'Help Desk path for access and correction requests',
+          ],
+        },
+        {
+          eyebrow: '06 Blockchain & third parties',
+          title: 'Ledgers and other brands',
+          body: 'Where we use blockchain or distributed ledger features, they supplement — not replace — legal agreements and plan documents. Third-party marks that appear on the site belong to their owners; appearance does not imply affiliation, sponsorship, or endorsement beyond expressly stated relationships.',
+          points: [
+            'Ledger features do not replace written agreements',
+            'Third-party networks may apply additional terms',
+            'Trademark ownership respected; no implied endorsement',
+            'Partner relationships only where expressly stated',
+          ],
+          tone: 'cream',
+        },
+        {
+          eyebrow: '07 Developers',
+          title: 'API and integration rules',
+          body: 'Developer access is subject to these terms plus any partner agreement. Store only the member data your product requires, honor scopes, verify webhooks, and never invent balances or eligibility. Production credentials may be revoked for misuse or security risk.',
+          points: [
+            'Partner agreements may add stricter obligations',
+            'Data minimization and scope enforcement',
+            'Signed webhooks and secure credential storage',
+            'Revocation for abuse or security incidents',
+          ],
+        },
+        {
+          eyebrow: '08 Disclaimers',
+          title: 'No securities, no tax advice, no guarantees',
+          body: 'This website does not constitute an offer of securities, an offer to sell, or a solicitation of an offer to buy any security. Nothing here is tax, legal, or investment advice. We do not guarantee savings, coverage, rewards outcomes, or investment results. Investor Relations materials are informational only.',
+          points: [
+            'Not an offer or solicitation of securities',
+            'Not tax, legal, or investment advice',
+            'No guaranteed savings, coverage, or rewards',
+            'Limitation of liability as permitted by law',
+          ],
+          tone: 'cream',
+        },
+        {
+          eyebrow: '09 Contact',
+          title: 'Legal and policy requests',
+          body: 'For policy questions, privacy requests, or trademark concerns, contact support@centuriesmutual.com and mark the subject “Legal.” Member product issues should use Help Desk. Regulatory notices and audit topics may also be routed through Audit & Compliance.',
+          points: [
+            'Email subject: Legal for policy matters',
+            'Help Desk for product and account support',
+            'Audit & Compliance for regulatory notices',
+            'Last substantive policy review: 2026',
+          ],
+        },
+      ]}
+    >
+      <section id="privacy" className="border-t border-[#E8EBEA] bg-[#FAFCFB] py-12 sm:py-16">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
+            Full text
+          </p>
+          <h2
+            className="mb-4 font-medium text-[#14432A]"
+            style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+            }}
+          >
+            Terms and Privacy (summary record)
+          </h2>
+          <div className="space-y-4 font-sans text-[0.9375rem] leading-[1.65] text-[#3d4a41]">
+            <p>
+              <strong className="text-[#14432A]">Agreement.</strong> These Terms
+              govern access to Centuries Mutual services. If you do not agree, do
+              not use the services. We may update Terms with notice where required;
+              continued use after the effective date constitutes acceptance.
+            </p>
+            <p>
+              <strong className="text-[#14432A]">Services.</strong> We provide
+              brokerage-related technology, rewards, documents, wellness and
+              performance programs, and related member tools. Offerings may change.
+              Insurance products remain subject to underwriting and plan documents.
+            </p>
+            <p>
+              <strong className="text-[#14432A]">Privacy.</strong> We process
+              personal data to operate accounts, deliver services, meet legal
+              obligations, and improve security. We do not sell personal
+              information in the conventional retail sense. Requests to access,
+              correct, or delete data (where applicable law provides) may be sent
+              via Help Desk.
+            </p>
+            <p>
+              <strong className="text-[#14432A]">Liability.</strong> To the
+              maximum extent permitted by law, Centuries Mutual is not liable for
+              indirect, incidental, or consequential damages arising from use of
+              the website or supplemental programs. Coverage disputes are governed
+              by plan documents and applicable insurance law.
+            </p>
+            <p className="text-[#55655D]">
+              For operational help see{' '}
+              <Link href="/help-desk" className="font-semibold text-[#14432A]">
+                Help Desk
+              </Link>
+              . For capital inquiries see{' '}
+              <Link
+                href="/investor-relations"
+                className="font-semibold text-[#14432A]"
+              >
+                Investor Relations
+              </Link>
+              .
             </p>
           </div>
-        </section>
-
-        <section className="py-5">
-          <div className="container" style={{ maxWidth: '860px' }}>
-            <p className="text-muted mb-5">
-              Below you will find our <strong className="text-dark">Terms and Conditions</strong> and{' '}
-              <strong className="text-dark">Privacy Policy</strong> in one place. These documents apply to members, 
-              hosts, tenants, landlords, and other users of Centuries Mutual. By accessing our platform, you agree 
-              to the Terms; our Privacy Policy explains how we handle personal data across payments, rentals, 
-              documents, and messaging products. For support questions, visit our{' '}
-              <Link href="/help-desk" style={{ color: '#14432A' }}>Help desk</Link>.
-            </p>
-
-            <article id="terms-and-conditions" className="mb-5 pb-5 border-bottom">
-              <h2 className="h3 fw-bold mb-4" style={{ color: '#14432A' }}>Terms and Conditions</h2>
-              <p className="text-muted small mb-4">Last updated: March 2026</p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">1. Agreement</h3>
-              <p className="text-muted">
-                These Terms and Conditions (&quot;Terms&quot;) govern your access to and use of websites, mobile applications, 
-                and related services operated by Centuries Mutual (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), including brokerage, 
-                network, blockchain-enabled features, document tools, and marketplace offerings. If you do not agree, 
-                do not use the services.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">2. Services</h3>
-              <p className="text-muted">
-                We provide a technology-forward brokerage and community platform that may include rental and roommate 
-                tools, eDocuments, payments and travel-related services, secure messaging, and other products described 
-                on our site. Specific offerings may change; we may modify or discontinue features with reasonable notice 
-                where required by law.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">3. Eligibility and accounts</h3>
-              <p className="text-muted">
-                You must be legally able to enter a binding contract in your jurisdiction. You are responsible for 
-                account credentials, accurate profile information, and all activity under your account. You must notify 
-                us promptly of unauthorized use.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">4. User conduct</h3>
-              <p className="text-muted">
-                You agree not to misuse the services: no unlawful activity, fraud, harassment, interference with security 
-                or systems, scraping that violates our rules, or attempts to circumvent access controls. Listings, 
-                messages, and documents you submit must comply with applicable law and must not infringe others&apos; rights.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">5. Blockchain and third-party technology</h3>
-              <p className="text-muted">
-                Where we describe blockchain, ledger, or distributed features, those tools supplement—not replace—your 
-                legal obligations and any written agreements (for example, leases or roommate arrangements). Third-party 
-                networks, wallet providers, or payment processors may apply additional terms.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">6. Fees and payments</h3>
-              <p className="text-muted">
-                Certain services may be subject to fees disclosed at checkout or in separate agreements. Taxes may apply. 
-                You authorize us and our partners to charge payment methods you provide according to those terms.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">7. Intellectual property</h3>
-              <p className="text-muted">
-                The platform, branding, and proprietary content are owned by Centuries Mutual or licensors. Except as 
-                expressly allowed, you may not copy, modify, distribute, or create derivative works from our materials.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">8. Disclaimers</h3>
-              <p className="text-muted">
-                Services are provided &quot;as is&quot; and &quot;as available&quot; to the fullest extent permitted by law. We do not 
-                guarantee uninterrupted or error-free operation. Brokerage and rental outcomes depend on many factors 
-                outside our control; platform tools are not a substitute for independent legal or financial advice.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">9. Limitation of liability</h3>
-              <p className="text-muted">
-                To the maximum extent permitted by law, Centuries Mutual and its affiliates will not be liable for 
-                indirect, incidental, special, consequential, or punitive damages, or for loss of profits, data, or goodwill, 
-                arising from your use of the services. Our aggregate liability for claims relating to the services is 
-                limited to the greater of amounts you paid us for the service giving rise to the claim in the twelve 
-                months before the claim or one hundred U.S. dollars, except where limitation is prohibited.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">10. Governing law</h3>
-              <p className="text-muted">
-                These Terms are governed by the laws of the State of Texas, without regard to conflict-of-law rules, 
-                except where mandatory consumer protections apply. Exclusive venue for disputes shall be in courts 
-                located in Dallas County, Texas, subject to arbitration or alternative dispute resolution if we specify 
-                a separate agreement with you.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">11. Changes</h3>
-              <p className="text-muted">
-                We may update these Terms by posting a revised version and updating the &quot;Last updated&quot; date. Continued 
-                use after changes constitutes acceptance of the updated Terms where permitted by law.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">12. Contact</h3>
-              <p className="text-muted mb-0">
-                For legal notices or questions about these Terms, use the channels listed on our{' '}
-                <Link href="/help-desk" style={{ color: '#14432A' }}>Help desk</Link> page.
-              </p>
-            </article>
-
-            <article id="privacy-policy">
-              <h2 className="h3 fw-bold mb-4" style={{ color: '#14432A' }}>Privacy Policy</h2>
-              <p className="text-muted small mb-4">Last updated: March 2026</p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">1. Scope</h3>
-              <p className="text-muted">
-                This Privacy Policy describes how Centuries Mutual collects, uses, discloses, and protects personal 
-                information when you use our websites, apps, and related services—including when you create a profile, 
-                list or search for housing, use eDocuments, send messages, or complete payments.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">2. Information we collect</h3>
-              <p className="text-muted">
-                We may collect identifiers (name, email, phone), account credentials, verification and trust-related 
-                data you choose to provide, payment information processed by partners, device and log data (IP address, 
-                browser type, usage metrics), content you submit (messages, listings, documents), and approximate 
-                location where needed for fraud prevention or service delivery.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">3. How we use information</h3>
-              <p className="text-muted">
-                We use personal information to provide and improve the platform, authenticate users, process 
-                transactions, communicate with you, personalize your experience (including &quot;For you&quot; style content 
-                where offered), detect abuse, comply with law, and enforce our Terms. We may use aggregated or 
-                de-identified data that does not identify you.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">4. Sharing</h3>
-              <p className="text-muted">
-                We may share information with service providers who assist with hosting, analytics, payments, customer 
-                support, and security; with other users where you direct (for example, showing listing or profile details); 
-                to comply with legal process; or in connection with a merger or asset sale. We do not sell your personal 
-                information for money as traditionally defined where such sale is restricted by applicable U.S. state law, 
-                except as described in any state-specific notice we provide.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">5. Cookies and similar technologies</h3>
-              <p className="text-muted">
-                We use cookies and similar tools for session management, preferences, analytics, and security. You may 
-                control cookies through browser settings; some features may not work if you disable them.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">6. Security</h3>
-              <p className="text-muted">
-                We implement administrative, technical, and organizational measures designed to protect personal data. 
-                No method of transmission over the Internet is completely secure; we encourage strong passwords and 
-                safeguarding your devices.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">7. Retention</h3>
-              <p className="text-muted">
-                We retain information as long as needed to provide services, comply with law, resolve disputes, and 
-                enforce agreements. Retention periods may vary by data category.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">8. Your choices</h3>
-              <p className="text-muted">
-                Depending on your location, you may have rights to access, correct, delete, or export personal information, 
-                or to object to or restrict certain processing. Contact us through the Help desk to exercise these rights; 
-                we may verify your request as permitted by law.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">9. Children</h3>
-              <p className="text-muted">
-                Our services are not directed to children under 13 (or the age required in your jurisdiction). We do 
-                not knowingly collect personal information from children.
-              </p>
-
-              <h3 className="h5 fw-bold mt-4 mb-3">10. Changes to this policy</h3>
-              <p className="text-muted mb-0">
-                We may update this Privacy Policy from time to time. We will post the updated policy and revise the 
-                &quot;Last updated&quot; date. For material changes, we may provide additional notice as required.
-              </p>
-            </article>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </>
+        </div>
+      </section>
+    </ImmersivePage>
   )
 }
