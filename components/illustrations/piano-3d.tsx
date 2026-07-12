@@ -6,12 +6,12 @@ import { Environment } from '@react-three/drei'
 import * as THREE from 'three'
 
 const GOLD = '#C9A53E'
-const WOOD = '#3A2416'
-const WOOD_LIGHT = '#5C3A24'
-const WOOD_EDGE = '#2A180F'
+const BLACK_GLOSS = '#101010'
+const BLACK_SOFT = '#1A1A1A'
+const BLACK_DEEP = '#0A0A0A'
 const IVORY = '#F4EEE4'
-const EBONY = '#171412'
-const BRASS = '#C9A53E'
+const EBONY = '#141210'
+const FELT = '#7A1F2B'
 
 function InvalidateOnSettle() {
   const invalidate = useThree((s) => s.invalidate)
@@ -30,145 +30,169 @@ function SoftFloat({ children }: { children: ReactNode }) {
     if (!ref.current) return
     const t = clock.elapsedTime
     ref.current.position.y = Math.sin(t * 0.2) * 0.028
-    ref.current.rotation.y = 0.42 + Math.sin(t * 0.12) * 0.018
+    ref.current.rotation.y = -0.6 + Math.sin(t * 0.12) * 0.018
   })
   return <group ref={ref}>{children}</group>
 }
 
-function useGrandBodyGeometry() {
+/**
+ * Grand piano plan silhouette. Front (keyboard) edge at z = 0, straight bass
+ * side on the left, treble side curving in to a rounded tail at z ≈ -2.2.
+ */
+function useGrandShape() {
   return useMemo(() => {
-    const shape = new THREE.Shape()
-    // Grand piano top silhouette (plan view), extruded for the case depth
-    shape.moveTo(-1.55, -0.55)
-    shape.lineTo(0.55, -0.55)
-    shape.quadraticCurveTo(1.75, -0.45, 1.85, 0.15)
-    shape.quadraticCurveTo(1.7, 0.72, 0.35, 0.78)
-    shape.lineTo(-1.55, 0.78)
-    shape.closePath()
-    const geom = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.42,
-      bevelEnabled: true,
-      bevelThickness: 0.02,
-      bevelSize: 0.02,
-      bevelSegments: 2,
-    })
-    geom.rotateX(-Math.PI / 2)
-    geom.translate(0, 0.21, 0)
-    geom.computeVertexNormals()
-    return geom
+    const s = new THREE.Shape()
+    s.moveTo(-1.0, 0)
+    s.lineTo(1.0, 0)
+    s.lineTo(1.0, 0.7)
+    s.quadraticCurveTo(1.02, 1.65, 0.25, 2.0)
+    s.quadraticCurveTo(-0.55, 2.3, -1.0, 1.45)
+    s.lineTo(-1.0, 0)
+    s.closePath()
+    return s
   }, [])
 }
 
+function useCaseGeometry(shape: THREE.Shape) {
+  return useMemo(() => {
+    const geom = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.34,
+      bevelEnabled: true,
+      bevelThickness: 0.015,
+      bevelSize: 0.015,
+      bevelSegments: 2,
+      curveSegments: 24,
+    })
+    // Lay flat: shape XY plane -> XZ plane, extrusion becomes height
+    geom.rotateX(-Math.PI / 2)
+    geom.computeVertexNormals()
+    return geom
+  }, [shape])
+}
+
+function useLidGeometry(shape: THREE.Shape) {
+  return useMemo(() => {
+    const geom = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.04,
+      bevelEnabled: true,
+      bevelThickness: 0.008,
+      bevelSize: 0.008,
+      bevelSegments: 1,
+      curveSegments: 24,
+    })
+    geom.rotateX(-Math.PI / 2)
+    geom.computeVertexNormals()
+    return geom
+  }, [shape])
+}
+
+const glossBlack = new THREE.MeshStandardMaterial({
+  color: BLACK_GLOSS,
+  metalness: 0.35,
+  roughness: 0.22,
+})
+const softBlack = new THREE.MeshStandardMaterial({
+  color: BLACK_SOFT,
+  metalness: 0.2,
+  roughness: 0.45,
+})
+const deepBlack = new THREE.MeshStandardMaterial({
+  color: BLACK_DEEP,
+  metalness: 0.25,
+  roughness: 0.35,
+})
+const brass = new THREE.MeshStandardMaterial({
+  color: GOLD,
+  metalness: 0.65,
+  roughness: 0.28,
+})
+
 function Keyboard() {
   const whiteKeys = useMemo(() => {
-    const notes = 26
-    return Array.from({ length: notes }, (_, i) => {
-      const x = -1.28 + i * 0.098
-      return { x, i }
-    })
+    const count = 29
+    const width = 1.76
+    const keyW = width / count
+    return Array.from({ length: count }, (_, i) => ({
+      x: -width / 2 + keyW / 2 + i * keyW,
+      w: keyW * 0.94,
+      i,
+    }))
   }, [])
 
   const blackKeys = useMemo(() => {
-    // Pattern relative to white keys: C# D#  F# G# A#
-    const pattern = [0, 1, 3, 4, 5]
+    const count = 29
+    const width = 1.76
+    const keyW = width / count
+    const pattern = [0, 1, 3, 4, 5] // C# D# F# G# A# offsets within an octave
     const keys: { x: number }[] = []
-    for (let octave = 0; octave < 4; octave++) {
+    for (let oct = 0; oct < 5; oct++) {
       for (const p of pattern) {
-        const whiteIndex = octave * 7 + p
-        if (whiteIndex >= 25) continue
-        keys.push({ x: -1.28 + whiteIndex * 0.098 + 0.065 })
+        const idx = oct * 7 + p
+        if (idx >= count - 1) continue
+        keys.push({ x: -width / 2 + keyW + idx * keyW })
       }
     }
     return keys
   }, [])
 
   return (
-    <group position={[0.05, 0.445, 0.62]}>
-      {/* Key bed */}
-      <mesh position={[0, -0.04, 0]}>
-        <boxGeometry args={[2.7, 0.06, 0.42]} />
-        <meshStandardMaterial color={WOOD_EDGE} metalness={0.08} roughness={0.7} />
+    <group position={[0, 0.85, 0.14]}>
+      {/* Key bed extending forward of the case */}
+      <mesh material={deepBlack} position={[0, -0.045, 0]}>
+        <boxGeometry args={[2.0, 0.07, 0.34]} />
+      </mesh>
+      {/* Cheek blocks at both ends */}
+      {[-0.94, 0.94].map((x) => (
+        <mesh key={x} material={glossBlack} position={[x, 0.015, 0]}>
+          <boxGeometry args={[0.11, 0.06, 0.34]} />
+        </mesh>
+      ))}
+      {/* Felt strip behind keys */}
+      <mesh position={[0, 0.015, -0.155]}>
+        <boxGeometry args={[1.76, 0.012, 0.03]} />
+        <meshStandardMaterial color={FELT} metalness={0.05} roughness={0.85} />
       </mesh>
       {whiteKeys.map((k) => (
-        <mesh key={`w-${k.i}`} position={[k.x, 0, 0]}>
-          <boxGeometry args={[0.09, 0.035, 0.36]} />
-          <meshStandardMaterial color={IVORY} metalness={0.05} roughness={0.45} />
+        <mesh key={`w-${k.i}`} position={[k.x, 0, 0.02]}>
+          <boxGeometry args={[k.w, 0.028, 0.3]} />
+          <meshStandardMaterial color={IVORY} metalness={0.04} roughness={0.4} />
         </mesh>
       ))}
       {blackKeys.map((k, i) => (
-        <mesh key={`b-${i}`} position={[k.x, 0.025, -0.04]}>
-          <boxGeometry args={[0.055, 0.045, 0.22]} />
-          <meshStandardMaterial color={EBONY} metalness={0.15} roughness={0.35} />
+        <mesh key={`b-${i}`} position={[k.x, 0.024, -0.045]}>
+          <boxGeometry args={[0.034, 0.032, 0.19]} />
+          <meshStandardMaterial color={EBONY} metalness={0.25} roughness={0.3} />
         </mesh>
       ))}
-      {/* Fallboard lip */}
-      <mesh position={[0, 0.05, -0.2]}>
-        <boxGeometry args={[2.72, 0.08, 0.05]} />
-        <meshStandardMaterial color={WOOD} metalness={0.08} roughness={0.65} />
+      {/* Fallboard raised behind the keys with gold maker line */}
+      <mesh material={glossBlack} position={[0, 0.075, -0.19]} rotation={[0.35, 0, 0]}>
+        <boxGeometry args={[1.98, 0.12, 0.03]} />
       </mesh>
-    </group>
-  )
-}
-
-function MusicStand() {
-  return (
-    <group position={[-0.15, 0.72, 0.35]}>
-      <mesh rotation={[-0.35, 0, 0]}>
-        <boxGeometry args={[0.85, 0.02, 0.42]} />
-        <meshStandardMaterial color={WOOD_LIGHT} metalness={0.08} roughness={0.7} />
+      <mesh material={brass} position={[0, 0.075, -0.172]} rotation={[0.35, 0, 0]}>
+        <boxGeometry args={[0.5, 0.008, 0.032]} />
       </mesh>
-      <mesh position={[0, -0.08, 0.18]} rotation={[-0.35, 0, 0]}>
-        <boxGeometry args={[0.85, 0.035, 0.03]} />
-        <meshStandardMaterial color={WOOD} metalness={0.08} roughness={0.65} />
-      </mesh>
-      {/* Sheet hint */}
-      <mesh position={[0, 0.02, 0]} rotation={[-0.35, 0, 0]}>
-        <boxGeometry args={[0.42, 0.002, 0.3]} />
-        <meshStandardMaterial color="#F7F3EE" metalness={0.02} roughness={0.9} />
-      </mesh>
-    </group>
-  )
-}
-
-function Pedals() {
-  return (
-    <group position={[-0.35, -0.55, 0.55]}>
-      <mesh position={[0, 0.08, 0]}>
-        <boxGeometry args={[0.55, 0.04, 0.18]} />
-        <meshStandardMaterial color={WOOD_EDGE} metalness={0.1} roughness={0.7} />
-      </mesh>
-      {[-0.16, 0, 0.16].map((x) => (
-        <mesh key={x} position={[x, 0.02, 0.08]} rotation={[0.2, 0, 0]}>
-          <boxGeometry args={[0.08, 0.015, 0.14]} />
-          <meshStandardMaterial color={BRASS} metalness={0.65} roughness={0.3} />
-        </mesh>
-      ))}
     </group>
   )
 }
 
 function Legs() {
-  const posts = [
-    [-1.15, 0.45],
-    [0.35, 0.45],
-    [-1.15, -0.25],
-    [0.85, -0.05],
-  ] as const
+  // Two front legs under the keyboard corners, one rear leg under the tail
+  const spots: ReadonlyArray<[number, number]> = [
+    [-0.82, -0.18],
+    [0.82, -0.18],
+    [-0.3, -1.85],
+  ]
   return (
     <group>
-      {posts.map(([x, z], i) => (
-        <group key={i} position={[x, -0.35, z]}>
-          <mesh>
-            <cylinderGeometry args={[0.045, 0.06, 0.7, 10]} />
-            <meshStandardMaterial color={WOOD} metalness={0.08} roughness={0.7} />
+      {spots.map(([x, z], i) => (
+        <group key={i} position={[x, 0, z]}>
+          {/* Tapered leg from case bottom to floor */}
+          <mesh material={glossBlack} position={[0, 0.28, 0]}>
+            <cylinderGeometry args={[0.055, 0.075, 0.56, 12]} />
           </mesh>
-          <mesh position={[0, -0.38, 0]}>
-            <cylinderGeometry args={[0.08, 0.08, 0.04, 12]} />
-            <meshStandardMaterial color={WOOD_EDGE} metalness={0.1} roughness={0.65} />
-          </mesh>
-          <mesh position={[0, 0.34, 0]}>
-            <sphereGeometry args={[0.035, 12, 12]} />
-            <meshStandardMaterial color={BRASS} metalness={0.55} roughness={0.35} />
+          {/* Brass caster */}
+          <mesh material={brass} position={[0, 0.025, 0]}>
+            <cylinderGeometry args={[0.05, 0.055, 0.05, 12]} />
           </mesh>
         </group>
       ))}
@@ -176,46 +200,81 @@ function Legs() {
   )
 }
 
+function PedalLyre() {
+  return (
+    <group position={[0, 0, -0.28]}>
+      {/* Twin posts down from the case */}
+      {[-0.09, 0.09].map((x) => (
+        <mesh key={x} material={glossBlack} position={[x, 0.32, 0]} rotation={[0.08, 0, 0]}>
+          <boxGeometry args={[0.045, 0.5, 0.045]} />
+        </mesh>
+      ))}
+      {/* Pedal box */}
+      <mesh material={deepBlack} position={[0, 0.09, 0.03]}>
+        <boxGeometry args={[0.4, 0.07, 0.14]} />
+      </mesh>
+      {/* Three brass pedals */}
+      {[-0.11, 0, 0.11].map((x) => (
+        <mesh key={x} material={brass} position={[x, 0.055, 0.115]} rotation={[0.35, 0, 0]}>
+          <boxGeometry args={[0.05, 0.014, 0.11]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function Bench() {
+  return (
+    <group position={[0, 0, 0.78]}>
+      <mesh material={glossBlack} position={[0, 0.42, 0]}>
+        <boxGeometry args={[0.9, 0.07, 0.34]} />
+      </mesh>
+      {/* Seat cushion hint */}
+      <mesh material={softBlack} position={[0, 0.465, 0]}>
+        <boxGeometry args={[0.86, 0.025, 0.3]} />
+      </mesh>
+      {[-0.38, 0.38].map((x) =>
+        [-0.12, 0.12].map((z) => (
+          <mesh key={`${x}-${z}`} material={glossBlack} position={[x, 0.2, z]}>
+            <cylinderGeometry args={[0.028, 0.038, 0.4, 10]} />
+          </mesh>
+        )),
+      )}
+    </group>
+  )
+}
+
 function Piano() {
-  const body = useGrandBodyGeometry()
+  const shape = useGrandShape()
+  const caseGeom = useCaseGeometry(shape)
+  const lidGeom = useLidGeometry(shape)
+
   return (
     <SoftFloat>
-      <group position={[0, -0.05, 0]} scale={0.95}>
-        {/* Case */}
-        <mesh geometry={body}>
-          <meshStandardMaterial color={WOOD} metalness={0.1} roughness={0.55} />
+      {/* Body spans z 0..-2.3; shift so the whole piano sits centered */}
+      <group position={[0.1, -0.72, 0.62]} scale={0.92}>
+        {/* Case — shape extrudes upward from y=0.52, tail already at -z */}
+        <mesh geometry={caseGeom} material={glossBlack} position={[0, 0.52, 0]} />
+
+        {/* Gold pinstripe around the case top edge (front) */}
+        <mesh material={brass} position={[0, 0.845, 0.005]}>
+          <boxGeometry args={[1.96, 0.006, 0.012]} />
         </mesh>
-        {/* Closed lid plane */}
-        <mesh position={[0.05, 0.445, -0.05]} rotation={[0.02, 0, 0]}>
-          <boxGeometry args={[3.05, 0.035, 1.15]} />
-          <meshStandardMaterial color={WOOD_LIGHT} metalness={0.12} roughness={0.48} />
-        </mesh>
-        {/* Lid edge gold line */}
-        <mesh position={[0.05, 0.465, 0.5]}>
-          <boxGeometry args={[2.7, 0.008, 0.02]} />
-          <meshStandardMaterial color={GOLD} metalness={0.5} roughness={0.35} />
+
+        {/* Raised lid — hinged on the straight bass (left) side */}
+        <group position={[-1.0, 0.9, 0]} rotation={[0, 0, 0.5]}>
+          <mesh geometry={lidGeom} material={glossBlack} position={[1.0, 0, 0]} scale={[0.985, 1, 0.985]} />
+        </group>
+
+        {/* Lid prop stick from inside the rim to the lid */}
+        <mesh material={brass} position={[0.32, 1.2, -0.9]} rotation={[0, 0, -0.25]}>
+          <cylinderGeometry args={[0.012, 0.012, 0.75, 8]} />
         </mesh>
 
         <Keyboard />
-        <MusicStand />
-        <Pedals />
         <Legs />
-
-        {/* Bench */}
-        <group position={[-0.2, -0.42, 1.35]}>
-          <mesh position={[0, 0.28, 0]}>
-            <boxGeometry args={[0.85, 0.07, 0.32]} />
-            <meshStandardMaterial color={WOOD} metalness={0.08} roughness={0.65} />
-          </mesh>
-          {[-0.32, 0.32].map((x) =>
-            [-0.1, 0.1].map((z) => (
-              <mesh key={`${x}-${z}`} position={[x, 0, z]}>
-                <cylinderGeometry args={[0.03, 0.035, 0.5, 8]} />
-                <meshStandardMaterial color={WOOD_EDGE} metalness={0.08} roughness={0.7} />
-              </mesh>
-            )),
-          )}
-        </group>
+        <PedalLyre />
+        <Bench />
       </group>
     </SoftFloat>
   )
@@ -229,9 +288,9 @@ function WarmShadow() {
     canvas.height = size
     const ctx = canvas.getContext('2d')!
     const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-    grad.addColorStop(0, 'rgba(58, 36, 22, 0.35)')
-    grad.addColorStop(0.55, 'rgba(58, 36, 22, 0.14)')
-    grad.addColorStop(1, 'rgba(58, 36, 22, 0)')
+    grad.addColorStop(0, 'rgba(20, 18, 16, 0.32)')
+    grad.addColorStop(0.55, 'rgba(20, 18, 16, 0.13)')
+    grad.addColorStop(1, 'rgba(20, 18, 16, 0)')
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, size, size)
     const tex = new THREE.CanvasTexture(canvas)
@@ -239,8 +298,8 @@ function WarmShadow() {
     return tex
   }, [])
   return (
-    <mesh position={[0, -0.92, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[6, 5]} />
+    <mesh position={[0, -0.74, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[6.4, 5.2]} />
       <meshBasicMaterial map={texture} transparent depthWrite={false} />
     </mesh>
   )
@@ -250,9 +309,9 @@ function Scene() {
   return (
     <>
       <InvalidateOnSettle />
-      <ambientLight intensity={0.55} color="#FFF6E8" />
-      <directionalLight position={[5, 8, 4]} intensity={1.35} color="#FFEFD6" />
-      <directionalLight position={[-4, 3, 2]} intensity={0.4} color="#EBDFC6" />
+      <ambientLight intensity={0.6} color="#FFF6E8" />
+      <directionalLight position={[5, 8, 4]} intensity={1.4} color="#FFEFD6" />
+      <directionalLight position={[-5, 4, 3]} intensity={0.5} color="#EBDFC6" />
       <directionalLight position={[0, 2, 6]} intensity={0.35} color={GOLD} />
       <Piano />
       <WarmShadow />
@@ -280,7 +339,7 @@ export function Piano3D({ className }: { className?: string }) {
         }
       >
         <Canvas
-          camera={{ position: [2.8, 2.2, 4.6], fov: 34 }}
+          camera={{ position: [2.6, 1.9, 4.8], fov: 34 }}
           dpr={[1, 2]}
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
