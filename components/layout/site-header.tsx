@@ -74,8 +74,8 @@ export function SiteHeader() {
           />
 
           <div className="relative mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-6">
-            <Link href="/" className="relative z-[1] flex min-w-0 shrink-0 items-center gap-2.5 no-underline sm:gap-3">
-              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md sm:h-10 sm:w-10">
+            <Link href="/" className="relative z-[1] flex min-w-0 shrink items-center gap-2 no-underline sm:gap-3">
+              <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md sm:h-10 sm:w-10">
                 <Image
                   src="/cmlogotreesmall-removebg-preview.png"
                   alt="Centuries Mutual"
@@ -86,22 +86,22 @@ export function SiteHeader() {
                 />
               </div>
               <span
-                className="leading-none text-[#FAF7F0]"
+                className="truncate leading-none text-[#FAF7F0]"
                 style={{
                   fontFamily: 'var(--font-fraunces), Fraunces, Georgia, serif',
                   fontWeight: 500,
                   letterSpacing: '-0.02em',
-                  fontSize: 'clamp(15px,2.2vw,26px)',
+                  fontSize: 'clamp(14px,3.8vw,26px)',
                 }}
               >
                 Centuries Mutual
               </span>
             </Link>
 
-            <div className="relative z-[1] flex min-w-0 items-center gap-4 xl:gap-6">
+            <div className="relative z-[1] flex shrink-0 items-center gap-3 sm:gap-4">
               <Link
                 href="/login"
-                className="ml-auto inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-[#FAFCFB] px-4 py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0F3D2E] no-underline shadow-sm transition hover:bg-white xl:ml-0"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-[#FAFCFB] px-3 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E] no-underline shadow-sm transition hover:bg-white sm:px-4 sm:text-[10px] sm:tracking-[0.14em]"
               >
                 Client Portal
               </Link>

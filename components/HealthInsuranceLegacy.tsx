@@ -107,7 +107,7 @@ export default function HealthInsuranceLegacy() {
   return (
     <>
       {/* Health insurance earnings — member compounding */}
-      <section className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#F4F1EC] py-20">
+      <section className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#F4F1EC] py-12 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div className="mx-auto max-w-3xl text-center" {...sectionAnimation}>
             <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
@@ -117,14 +117,14 @@ export default function HealthInsuranceLegacy() {
               className="mb-3 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"
               style={{
                 fontFamily: "'Playfair Display', serif",
-                fontSize: 'clamp(2rem, 4.2vw, 3rem)',
+                fontSize: 'clamp(1.75rem, 4.2vw, 3rem)',
               }}
             >
               Compound Exclusively with Centuries Mutual
             </h2>
           </motion.div>
 
-          <div className="mt-12 grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 items-center gap-8 sm:mt-10 lg:mt-12 lg:grid-cols-2 lg:gap-10">
             <motion.div {...slideInLeft}>
               <NySkyline3D />
             </motion.div>
@@ -154,7 +154,7 @@ export default function HealthInsuranceLegacy() {
 
           {/* Partners */}
           <motion.div
-            className="mx-auto mt-20 max-w-3xl text-center"
+            className="mx-auto mt-12 max-w-3xl text-center sm:mt-16 lg:mt-20"
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-100px' }}
@@ -233,7 +233,7 @@ export default function HealthInsuranceLegacy() {
       <section
         id="legacy-of-trust"
         aria-label="A Legacy of Trust — Established 2024"
-        className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#FAFCFB] py-20"
+        className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#FAFCFB] py-12 sm:py-16 lg:py-20"
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
@@ -276,7 +276,7 @@ export default function HealthInsuranceLegacy() {
                 className="mb-4 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"
                 style={{
                   fontFamily: "'Playfair Display', serif",
-                  fontSize: 'clamp(2rem, 4.4vw, 3rem)',
+                  fontSize: 'clamp(1.75rem, 4.4vw, 3rem)',
                 }}
               >
                 A Legacy of Trust

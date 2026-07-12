@@ -24,7 +24,7 @@ const Piano3D = dynamic(
 
 export default function WintergardenMusic() {
   return (
-    <section className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#FAFCFB] py-20">
+    <section className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#FAFCFB] py-12 sm:py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           className="mx-auto max-w-3xl text-center"
@@ -40,12 +40,12 @@ export default function WintergardenMusic() {
             className="mb-3 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"
             style={{
               fontFamily: "'Playfair Display', serif",
-              fontSize: 'clamp(2rem, 4.2vw, 3rem)',
+              fontSize: 'clamp(1.75rem, 4.2vw, 3rem)',
             }}
           >
             Music Performance Software
           </h2>
-          <p className="mx-auto max-w-[640px] font-sans text-[1.0625rem] leading-[1.6] text-[#55655D]">
+          <p className="mx-auto max-w-[640px] font-sans text-[0.9375rem] leading-[1.6] text-[#55655D] sm:text-[1.0625rem]">
             Wintergarden is Centuries Mutual&apos;s music performance software and
             game — a studio for rehearsal, stagecraft, and technique that turns
             practice into scored play. Open{' '}
@@ -59,7 +59,7 @@ export default function WintergardenMusic() {
           </p>
         </motion.div>
 
-        <div className="mt-12 grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+        <div className="mt-8 grid grid-cols-1 items-center gap-8 sm:mt-10 lg:mt-12 lg:grid-cols-2 lg:gap-10">
           <motion.div {...slideInLeft}>
             <UnifiedBenefitCard
               eyebrow="How it works"

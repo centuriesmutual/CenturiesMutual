@@ -1,6 +1,6 @@
 import './globals.css'
 import type { ReactNode } from 'react'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import { Analytics } from '@vercel/analytics/react'
@@ -10,6 +10,13 @@ import { metadata as siteMetadata } from './metadata'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = siteMetadata
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#0F3D2E',
+}
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

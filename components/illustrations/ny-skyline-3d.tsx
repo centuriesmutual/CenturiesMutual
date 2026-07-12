@@ -446,8 +446,8 @@ export function NySkyline3D({ className }: { className?: string }) {
       className={className}
       style={{
         width: '100%',
-        height: 'min(420px, 58vw)',
-        minHeight: 300,
+        height: 'min(380px, 72vw)',
+        minHeight: 240,
         borderRadius: 20,
         overflow: 'hidden',
         background: BG,
@@ -465,7 +465,7 @@ export function NySkyline3D({ className }: { className?: string }) {
         <Canvas
           frameloop="demand"
           camera={{ position: [0, 2.6, 8.6], fov: 35 }}
-          dpr={[1, 2]}
+          dpr={[1, 1.75]}
           gl={{ antialias: true }}
         >
           <Scene />

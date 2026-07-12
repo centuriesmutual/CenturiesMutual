@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { Environment } from '@react-three/drei'
+import { Environment, ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
 
 const GOLD = '#C9A53E'
@@ -451,6 +451,14 @@ function Scene() {
       <directionalLight position={[0, 4, 0]} intensity={0.55} color="#FFF2D8" />
       <directionalLight position={[0, 2, 7]} intensity={0.3} color={GOLD} />
       <Colosseum />
+      <ContactShadows
+        position={[0, -0.98, 0]}
+        opacity={0.28}
+        scale={12}
+        blur={2.6}
+        far={5}
+        color="#7A6540"
+      />
       <Environment preset="sunset" />
     </>
   )
@@ -462,8 +470,8 @@ export function Colosseum3D({ className }: { className?: string }) {
       className={className}
       style={{
         width: '100%',
-        height: 'min(460px, 62vw)',
-        minHeight: 320,
+        height: 'min(420px, 70vw)',
+        minHeight: 240,
         background: 'transparent',
       }}
     >
@@ -478,7 +486,7 @@ export function Colosseum3D({ className }: { className?: string }) {
           frameloop="demand"
           shadows="soft"
           camera={{ position: [0, 1.85, 8.4], fov: 34 }}
-          dpr={[1, 2]}
+          dpr={[1, 1.75]}
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
         >

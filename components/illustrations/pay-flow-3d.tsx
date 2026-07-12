@@ -139,8 +139,8 @@ export function PayFlow3D({ className }: { className?: string }) {
       className={className}
       style={{
         width: '100%',
-        height: 'min(420px, 58vw)',
-        minHeight: 300,
+        height: 'min(380px, 72vw)',
+        minHeight: 240,
         background: 'transparent',
       }}
     >

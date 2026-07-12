@@ -326,8 +326,8 @@ export function Piano3D({ className }: { className?: string }) {
       className={className}
       style={{
         width: '100%',
-        height: 'min(460px, 62vw)',
-        minHeight: 320,
+        height: 'min(420px, 70vw)',
+        minHeight: 240,
         background: 'transparent',
       }}
     >
@@ -340,7 +340,7 @@ export function Piano3D({ className }: { className?: string }) {
       >
         <Canvas
           camera={{ position: [2.6, 1.9, 4.8], fov: 34 }}
-          dpr={[1, 2]}
+          dpr={[1, 1.75]}
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
         >

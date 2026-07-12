@@ -66,7 +66,7 @@ export function UnifiedBenefitCard({
 }) {
   return (
     <motion.div
-      className={`rounded-2xl bg-[#14432A]/[0.06] p-6 sm:p-7 ${className}`}
+      className={`rounded-2xl bg-[#14432A]/[0.06] p-5 sm:p-6 lg:p-7 ${className}`}
       initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-50px' }}
