@@ -1,7 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
 import {
@@ -107,12 +106,12 @@ function EstRibbon() {
 export default function HealthInsuranceLegacy() {
   return (
     <>
-      {/* Health insurance earnings */}
+      {/* Wintergarden — music performance software / game */}
       <section className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#F4F1EC] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div className="mx-auto max-w-3xl text-center" {...sectionAnimation}>
             <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
-              — Health Insurance Earnings
+              — Wintergarden
             </p>
             <h2
               className="mb-3 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"
@@ -121,7 +120,7 @@ export default function HealthInsuranceLegacy() {
                 fontSize: 'clamp(2rem, 4.2vw, 3rem)',
               }}
             >
-              Compound Exclusively with Centuries Mutual
+              Perform, Practice &amp; Progress
             </h2>
           </motion.div>
 
@@ -132,22 +131,22 @@ export default function HealthInsuranceLegacy() {
 
             <motion.div {...slideInRight}>
               <UnifiedBenefitCard
-                eyebrow="Member-only growth"
-                title="Compounding that stays inside Centuries Mutual"
+                eyebrow="Music performance software"
+                title="A game-built studio for musical performance development"
                 body={
                   <p className="m-0">
-                    Growth runs exclusively inside Centuries Mutual — never on
-                    third-party platforms. Supplemental credits fold back into
-                    balances that keep earning, and rate, principal, and projected
-                    value stay visible on one dated surface, locked to your
-                    verified member identity.
+                    Wintergarden is Centuries Mutual&apos;s music performance
+                    software and game offering — a disciplined environment where
+                    musicians rehearse, perform, and level up technique through
+                    playable sessions, scored practice, and progressive challenges
+                    designed for real performance growth.
                   </p>
                 }
                 points={[
-                  'Member-only compounding, exclusively inside Centuries Mutual',
-                  'Rewards fold back into principal and keep earning',
-                  'Rate, principal, and projected value on one dated surface',
-                  'Locked to your verified Centuries Mutual identity',
+                  'Interactive performance sessions that feel like a game, not a drill sheet',
+                  'Scored practice that tracks timing, phrasing, and stage readiness',
+                  'Progressive challenges that build repertoire and performance stamina',
+                  'Member-linked development — your Wintergarden progress stays with your Centuries Mutual identity',
                 ]}
               />
             </motion.div>
@@ -292,62 +291,6 @@ export default function HealthInsuranceLegacy() {
                 relationship with encryption, secure data handling, and
                 transparent practices that keep coverage clear and credible.
               </p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* About Centuries Mutual */}
-      <section className="relative overflow-hidden bg-[#14432A] py-16 text-[#FAFCFB]">
-        {/* gold rule */}
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-px"
-          style={{
-            background:
-              'linear-gradient(90deg, transparent 0%, rgba(201,165,62,0.45) 35%, rgba(201,165,62,0.45) 65%, transparent 100%)',
-          }}
-        />
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
-            <motion.div
-              className="lg:col-span-8"
-              initial={{ opacity: 0, x: -32 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: '-100px' }}
-              transition={{ duration: 1.15 }}
-            >
-              <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
-                — About
-              </p>
-              <h2
-                className="mb-3 font-medium leading-[1.2] tracking-[-0.005em] text-[#FAFCFB]"
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: 'clamp(1.75rem, 3.6vw, 2.5rem)',
-                }}
-              >
-                About Centuries Mutual
-              </h2>
-              <p className="max-w-[640px] font-sans text-[1.0625rem] leading-[1.7] text-[#FAFCFB]/85">
-                A trusted health insurance company dedicated to exclusive
-                coverage and lasting relationships with our members.
-              </p>
-            </motion.div>
-
-            <motion.div
-              className="lg:col-span-4 lg:text-right"
-              initial={{ opacity: 0, x: 32 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: '-100px' }}
-              transition={{ duration: 1.15 }}
-            >
-              <Link
-                href="/about"
-                className="inline-flex items-center justify-center rounded-[10px] border border-white/[0.18] bg-[#FAFCFB] px-4 py-2 font-sans text-[0.875rem] font-semibold tracking-[0.01em] text-[#14432A] shadow-[0_12px_28px_-12px_rgba(0,0,0,0.4)] transition hover:bg-white no-underline"
-              >
-                Learn More About Us
-              </Link>
             </motion.div>
           </div>
         </div>
