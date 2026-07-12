@@ -49,7 +49,7 @@ export default function HealthInsurancePay() {
           <motion.div className="lg:order-1" {...slideInLeft}>
             <UnifiedBenefitCard
               eyebrow="Everyday pay"
-              title="Rent, bills, and groceries in one place"
+              title="Supplement Rent, Bills, and Groceries"
               body={
                 <p className="m-0">
                   Send rent on a schedule, settle utilities from the same ledger, and

@@ -1,7 +1,6 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
   slideInLeft,
@@ -43,26 +42,14 @@ export default function WintergardenMusic() {
               fontSize: 'clamp(1.75rem, 4.2vw, 3rem)',
             }}
           >
-            Music Performance Software
+            Music Performance Conservatory
           </h2>
-          <p className="mx-auto max-w-[640px] font-sans text-[0.9375rem] leading-[1.6] text-[#55655D] sm:text-[1.0625rem]">
-            Wintergarden is Centuries Mutual&apos;s music performance software and
-            game — a studio for rehearsal, stagecraft, and technique that turns
-            practice into scored play. Open{' '}
-            <Link
-              href="/wintergarden"
-              className="font-semibold text-[#14432A] underline decoration-[#C9A53E]/60 underline-offset-2 hover:decoration-[#C9A53E]"
-            >
-              Wintergarden
-            </Link>{' '}
-            to develop real performance skill inside your membership.
-          </p>
         </motion.div>
 
         <div className="mt-8 grid grid-cols-1 items-center gap-8 sm:mt-10 lg:mt-12 lg:grid-cols-2 lg:gap-10">
           <motion.div {...slideInLeft}>
             <UnifiedBenefitCard
-              eyebrow="How it works"
+              eyebrow="Main Ticket"
               title="Rehearse, perform, and level up"
               body={
                 <p className="m-0">

@@ -50,20 +50,21 @@ export default function HealthInsuranceWallet() {
           <motion.div {...slideInRight}>
             <UnifiedBenefitCard
               eyebrow="Healthcare rewards"
-              title="One wallet clipped to your membership"
+              title="Signature Digital Wallet"
               body={
                 <p className="m-0">
-                  Attach a rewards wallet to your Centuries Mutual identity and earn
-                  supplemental credits on eligible activity — rent, bills, and member
-                  programs. Accruals land in a clear, dated ledger and stay locked to
-                  your verified account, transferable only by you.
+                  Earn rewards on a wallet tied to your Centuries Mutual identity —
+                  supplemental credits for eligible activity like rent, bills, and
+                  member programs. Every credit you earn shows up in chronological
+                  order with dates and amounts you can review anytime, tied to your
+                  verified member account.
                 </p>
               }
               points={[
-                'Clip the wallet to your account in one step',
-                'Earn on everyday eligible activity',
-                'Watch credits accrue with a dated ledger',
-                'Rewards stay member-locked and portable only by you',
+                'Link the wallet to your membership in one step',
+                'Earn rewards when you do everyday eligible activities',
+                'See every credit listed with the date it was earned',
+                'Only you can use or move your rewards',
               ]}
             />
           </motion.div>

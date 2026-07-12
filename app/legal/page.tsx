@@ -181,8 +181,8 @@ export default function LegalPage() {
               .
             </p>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
     </ImmersivePage>
   )
 }

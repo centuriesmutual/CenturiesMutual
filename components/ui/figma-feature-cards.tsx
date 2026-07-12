@@ -88,7 +88,7 @@ export function UnifiedBenefitCard({
       </h3>
       <div className="font-sans text-[0.9375rem] leading-[1.65] text-[#55655D]">{body}</div>
       {points && points.length > 0 ? (
-        <ul className="mt-5 space-y-2.5 border-t border-[#14432A]/10 pt-5">
+        <ul className="mt-3 space-y-2 border-t border-[#14432A]/10 pt-3">
           {points.map((point) => (
             <li key={point} className="flex items-start gap-2.5">
               <span

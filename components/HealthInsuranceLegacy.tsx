@@ -111,7 +111,7 @@ export default function HealthInsuranceLegacy() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div className="mx-auto max-w-3xl text-center" {...sectionAnimation}>
             <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
-              — Health Insurance Earnings
+              — Compound Interest
             </p>
             <h2
               className="mb-3 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"
@@ -120,7 +120,7 @@ export default function HealthInsuranceLegacy() {
                 fontSize: 'clamp(1.75rem, 4.2vw, 3rem)',
               }}
             >
-              Compound Exclusively with Centuries Mutual
+              Centuries Mutual: Exclusive
             </h2>
           </motion.div>
 
@@ -131,22 +131,26 @@ export default function HealthInsuranceLegacy() {
 
             <motion.div {...slideInRight}>
               <UnifiedBenefitCard
-                eyebrow="Member-only growth"
+                eyebrow="Membership"
                 title="Compounding that stays inside Centuries Mutual"
                 body={
                   <p className="m-0">
-                    Growth runs exclusively inside Centuries Mutual — never on
-                    third-party platforms. Supplemental credits fold back into
-                    balances that keep earning, and rate, principal, and projected
-                    value stay visible on one dated surface, locked to your
-                    verified member identity.
+                    Centuries Mutual&apos;s compounding program is a member benefit
+                    defined in your applicable program terms and plan documents —
+                    not a third-party investment product and not an offer of
+                    securities. Eligible supplemental credits may be applied to
+                    member balances under disclosed rates, schedules, and
+                    eligibility rules; principal, rate, and projected value appear
+                    on a dated member surface tied to your verified identity.
+                    Outcomes vary by participation and governing documents, and
+                    nothing on this site guarantees any return.
                   </p>
                 }
                 points={[
-                  'Member-only compounding, exclusively inside Centuries Mutual',
-                  'Rewards fold back into principal and keep earning',
+                  'Compounding defined by member program terms and plan documents',
+                  'Eligible credits applied under disclosed rates and schedules',
                   'Rate, principal, and projected value on one dated surface',
-                  'Locked to your verified Centuries Mutual identity',
+                  'Not an offer of securities; outcomes are not guaranteed',
                 ]}
               />
             </motion.div>

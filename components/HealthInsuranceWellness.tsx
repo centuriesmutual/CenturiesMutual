@@ -42,18 +42,18 @@ export default function HealthInsuranceWellness() {
               fontSize: 'clamp(1.75rem, 4.2vw, 3rem)',
             }}
           >
-            My Brother&apos;s Keeper
+            My Brothers Keeper
           </h2>
         </motion.div>
 
         <div className="mt-8 grid grid-cols-1 items-center gap-8 sm:mt-10 lg:mt-12 lg:grid-cols-2 lg:gap-10">
           <motion.div {...slideInLeft}>
             <UnifiedBenefitCard
-              eyebrow="Wellness bridge"
-              title="Fitness that feeds your membership"
+              eyebrow="For Thy Brother"
+              title="Your Legacy in Motion"
               body={
                 <p className="m-0">
-                  Workouts logged in My Brother&apos;s Keeper flow straight into your
+                  Workouts logged in My Brothers Keeper flow straight into your
                   Centuries Mutual profile — streaks and daily goals stay visible
                   beside your member ledger, and eligible activity can unlock
                   supplemental credits on your attached wallet. One login, one
@@ -61,7 +61,7 @@ export default function HealthInsuranceWellness() {
                 </p>
               }
               points={[
-                'Workouts sync automatically from My Brother’s Keeper',
+                'Workouts sync automatically from My Brothers Keeper',
                 'Streaks and daily goals beside your member ledger',
                 'Health progress connects without a second login',
                 'Eligible activity can unlock wallet credits',
