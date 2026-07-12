@@ -1,6 +1,7 @@
 import HealthInsuranceWallet from '../components/HealthInsuranceWallet'
 import HealthInsurancePay from '../components/HealthInsurancePay'
 import HealthInsuranceWellness from '../components/HealthInsuranceWellness'
+import WintergardenMusic from '../components/WintergardenMusic'
 import HealthInsuranceLegacy from '../components/HealthInsuranceLegacy'
 import Footer from '../components/Footer'
 import { SiteHeader } from '../components/layout/site-header'
@@ -15,6 +16,7 @@ export default function Home() {
         <HealthInsuranceWallet />
         <HealthInsurancePay />
         <HealthInsuranceWellness />
+        <WintergardenMusic />
         <HealthInsuranceLegacy />
         <Footer />
       </main>

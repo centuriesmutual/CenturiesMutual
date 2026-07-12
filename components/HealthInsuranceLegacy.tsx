@@ -106,12 +106,12 @@ function EstRibbon() {
 export default function HealthInsuranceLegacy() {
   return (
     <>
-      {/* Wintergarden — music performance software / game */}
+      {/* Health insurance earnings — member compounding */}
       <section className="relative overflow-hidden border-t border-[#E8EBEA] bg-[#F4F1EC] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div className="mx-auto max-w-3xl text-center" {...sectionAnimation}>
             <p className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
-              — Wintergarden
+              — Health Insurance Earnings
             </p>
             <h2
               className="mb-3 font-medium leading-[1.15] tracking-[-0.01em] text-[#14432A]"
@@ -120,7 +120,7 @@ export default function HealthInsuranceLegacy() {
                 fontSize: 'clamp(2rem, 4.2vw, 3rem)',
               }}
             >
-              Perform, Practice &amp; Progress
+              Compound Exclusively with Centuries Mutual
             </h2>
           </motion.div>
 
@@ -131,22 +131,22 @@ export default function HealthInsuranceLegacy() {
 
             <motion.div {...slideInRight}>
               <UnifiedBenefitCard
-                eyebrow="Music performance software"
-                title="A game-built studio for musical performance development"
+                eyebrow="Member-only growth"
+                title="Compounding that stays inside Centuries Mutual"
                 body={
                   <p className="m-0">
-                    Wintergarden is Centuries Mutual&apos;s music performance
-                    software and game offering — a disciplined environment where
-                    musicians rehearse, perform, and level up technique through
-                    playable sessions, scored practice, and progressive challenges
-                    designed for real performance growth.
+                    Growth runs exclusively inside Centuries Mutual — never on
+                    third-party platforms. Supplemental credits fold back into
+                    balances that keep earning, and rate, principal, and projected
+                    value stay visible on one dated surface, locked to your
+                    verified member identity.
                   </p>
                 }
                 points={[
-                  'Interactive performance sessions that feel like a game, not a drill sheet',
-                  'Scored practice that tracks timing, phrasing, and stage readiness',
-                  'Progressive challenges that build repertoire and performance stamina',
-                  'Member-linked development — your Wintergarden progress stays with your Centuries Mutual identity',
+                  'Member-only compounding, exclusively inside Centuries Mutual',
+                  'Rewards fold back into principal and keep earning',
+                  'Rate, principal, and projected value on one dated surface',
+                  'Locked to your verified Centuries Mutual identity',
                 ]}
               />
             </motion.div>
