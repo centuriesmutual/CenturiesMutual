@@ -5,7 +5,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { motion } from 'framer-motion'
 import { SiteHeader } from '@/components/layout/site-header'
 import { UnifiedBenefitCard } from '@/components/ui/figma-feature-cards'
-import { saveSession, saveProfile, DEFAULT_PROFILE } from '@/lib/member-profile'
+import { establishSession, saveProfile, DEFAULT_PROFILE } from '@/lib/member-profile'
 import { slideInLeft, slideInRight, sectionAnimation } from '@/utils/home-animations'
 
 interface SignupFormData {
@@ -133,10 +133,7 @@ export default function CreateAccountPage() {
     }
 
     setIsSubmitting(false)
-    saveSession({
-      username: email,
-      loggedInAt: new Date().toISOString(),
-    })
+    establishSession(email)
     saveProfile(DEFAULT_PROFILE)
     setSuccess(true)
   }

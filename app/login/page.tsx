@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { clearSession, establishSession } from '@/lib/member-profile'
 
 interface LoginFormData {
   email: string
@@ -18,6 +19,11 @@ export default function Login() {
   })
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Login is always a fresh auth surface — no lingering Wallet session.
+    clearSession()
+  }, [])
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -38,15 +44,7 @@ export default function Login() {
 
     try {
       const username = formData.email.trim() || 'member'
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(
-          'cm_member_session',
-          JSON.stringify({
-            username,
-            loggedInAt: new Date().toISOString(),
-          }),
-        )
-      }
+      establishSession(username)
       window.location.href = '/wallet'
     } catch {
       setError('An error occurred during login. Please try again.')

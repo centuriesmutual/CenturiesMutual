@@ -13,6 +13,7 @@ import {
   saveLinkedAccount,
   type LinkedProvider,
 } from '@/lib/payout-links'
+import { markOauthHold } from '@/lib/member-profile'
 
 export type CashOutDestination = LinkedProvider
 
@@ -106,6 +107,7 @@ export function CashOutFlow({
       setLinked((p) => ({ ...p, paymentus: true }))
       return
     }
+    markOauthHold()
     window.location.href = `${dest.oauthPath}?return=/wallet`
   }
 

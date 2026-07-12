@@ -3,10 +3,11 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'framer-motion'
 import { Fraunces } from 'next/font/google'
 import { cn } from '@/lib/utils'
+import { ensurePublicSiteLoggedOut } from '@/lib/member-profile'
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -29,8 +30,22 @@ export const SITE_HEADER_STACK_PX = SITE_HEADER_TOP_RULE_PX + SITE_HEADER_BAR_PX
 
 export function SiteHeader() {
   const { scrollY } = useScroll()
+  const pathname = usePathname()
   const prevY = useRef(0)
   const [hidden, setHidden] = useState(false)
+
+  useEffect(() => {
+    // Public marketing surfaces are always logged out. Keep auth/entry pages intact.
+    if (
+      !pathname ||
+      pathname.startsWith('/wallet') ||
+      pathname === '/login' ||
+      pathname.startsWith('/create-account')
+    ) {
+      return
+    }
+    ensurePublicSiteLoggedOut()
+  }, [pathname])
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
     const current = latest ?? 0
@@ -142,7 +157,7 @@ function ClientPortalButton() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             onAnimationComplete={() => {
-              router.push('/wallet')
+              router.push('/login')
             }}
           >
             <motion.div
@@ -161,7 +176,7 @@ function ClientPortalButton() {
                   fontSize: '1.35rem',
                 }}
               >
-                Opening your feed…
+                Opening secure sign-in…
               </p>
             </motion.div>
           </motion.div>

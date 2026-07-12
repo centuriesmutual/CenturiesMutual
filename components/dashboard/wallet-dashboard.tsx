@@ -20,20 +20,27 @@ import { TransactionHistory } from '@/components/dashboard/transaction-history'
 import { EnrollmentWelcome } from '@/components/dashboard/enrollment-welcome'
 import { YoutubeExperience } from '@/components/dashboard/youtube-experience'
 import {
-  clearSession,
+  MbkIntelligence,
+  WintergardenIntelligence,
+} from '@/components/dashboard/app-intelligence'
+import {
   DEFAULT_PROFILE,
+  endWalletSession,
   loadProfile,
-  loadSession,
+  markSessionEnding,
   saveProfile,
-  todayKey,
+  validateWalletAccess,
   type MemberProfile,
   type MemberSession,
 } from '@/lib/member-profile'
 import { loadLedger, appendLedgerEntry, type LedgerEntry } from '@/lib/wallet-ledger'
 import { saveLinkedAccount } from '@/lib/payout-links'
+import {
+  finishWalletOauthRedirect,
+  useWalletSessionGuard,
+} from '@/components/dashboard/use-wallet-session-guard'
 
 const REWARDS_BALANCE = 0
-const DAILY_TOKENS = 25
 
 type Tab =
   | 'home'
@@ -79,16 +86,19 @@ export default function WalletDashboard() {
   const [oauthNotice, setOauthNotice] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  useWalletSessionGuard(ready)
+
   useEffect(() => {
-    const s = loadSession()
-    if (!s) {
+    const access = validateWalletAccess()
+    if (!access.ok) {
       router.replace('/login')
       return
     }
-    setSession(s)
+    setSession(access.session)
     setProfile(loadProfile())
     setLedger(loadLedger())
     setReady(true)
+    finishWalletOauthRedirect()
 
     const params = new URLSearchParams(window.location.search)
     const oauth = params.get('oauth')
@@ -133,27 +143,9 @@ export default function WalletDashboard() {
   }, [])
 
   const handleLogout = () => {
-    clearSession()
-    router.push('/login')
-  }
-
-  const canClaim = profile.wgLastClaim !== todayKey()
-
-  const claimTokens = () => {
-    if (!canClaim) return
-    persistProfile({
-      ...profile,
-      wgTokens: profile.wgTokens + DAILY_TOKENS,
-      wgLastClaim: todayKey(),
-    })
-  }
-
-  const toggleMbk = () => {
-    persistProfile({
-      ...profile,
-      mbkConnected: !profile.mbkConnected,
-      mbkStreak: 0,
-    })
+    markSessionEnding()
+    endWalletSession()
+    router.replace('/login')
   }
 
   const completeEnrollment = (plan: EnrolledPlan) => {
@@ -523,114 +515,13 @@ export default function WalletDashboard() {
 
             {tab === 'mbk' ? (
               <motion.div key="mbk" {...panelMotion}>
-                <h1
-                  className="mb-5 font-medium text-[#14432A]"
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontSize: 'clamp(1.6rem, 3vw, 2.1rem)',
-                  }}
-                >
-                  My Brothers Keeper
-                </h1>
-                <div className="rounded-2xl bg-[#14432A]/[0.06] p-6">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <p className="m-0 font-sans text-[1rem] font-semibold text-[#14432A]">
-                        {profile.mbkConnected ? 'Connected' : 'Not connected'}
-                      </p>
-                      <p className="mb-0 mt-1 max-w-md font-sans text-[0.8125rem] leading-[1.55] text-[#55655D]">
-                        {profile.mbkConnected
-                          ? 'Workouts sync into your membership and can unlock wallet credits.'
-                          : 'Link My Brothers Keeper so workouts and streaks flow into your ledger.'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleMbk}
-                      className={`rounded-[10px] px-4 py-2 font-sans text-[0.8125rem] font-semibold ${
-                        profile.mbkConnected
-                          ? 'border border-[#14432A]/25 text-[#14432A]'
-                          : 'bg-[#0F3D2E] text-[#FAFCFB]'
-                      }`}
-                    >
-                      {profile.mbkConnected ? 'Disconnect' : 'Connect account'}
-                    </button>
-                  </div>
-                  {profile.mbkConnected ? (
-                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {[
-                        { label: 'Weekly streak', value: `${profile.mbkStreak} days` },
-                        { label: 'Workouts', value: '0' },
-                        { label: 'Credits', value: usd(0) },
-                        { label: 'Next goal', value: '—' },
-                      ].map((s) => (
-                        <div key={s.label} className="rounded-[12px] bg-white p-4">
-                          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
-                            {s.label}
-                          </p>
-                          <p className="m-0 mt-1 font-sans text-[1.05rem] font-semibold text-[#14432A]">
-                            {s.value}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  <a
-                    href="https://mybrotherskeeper.cc"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-5 inline-block font-sans text-[0.75rem] font-semibold text-[#0F3D2E]"
-                  >
-                    Open mybrotherskeeper.cc →
-                  </a>
-                </div>
+                <MbkIntelligence />
               </motion.div>
             ) : null}
 
             {tab === 'wintergarden' ? (
               <motion.div key="wintergarden" {...panelMotion}>
-                <h1
-                  className="mb-5 font-medium text-[#14432A]"
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontSize: 'clamp(1.6rem, 3vw, 2.1rem)',
-                  }}
-                >
-                  Wintergarden
-                </h1>
-                <div className="rounded-2xl bg-[#0F3D2E] p-6 sm:p-8">
-                  <p className="m-0 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.1em] text-[#FAFCFB]/60">
-                    Token balance
-                  </p>
-                  <p
-                    className="m-0 mt-1 font-medium tabular-nums text-[#FAFCFB]"
-                    style={{
-                      fontFamily: "'Playfair Display', Georgia, serif",
-                      fontSize: 'clamp(2rem, 4.5vw, 2.8rem)',
-                    }}
-                  >
-                    {profile.wgTokens} <span className="text-[0.5em] text-[#C9A53E]">WG</span>
-                  </p>
-                  <p className="mb-0 mt-2 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#FAFCFB]/75">
-                    Claim daily tokens to unlock rehearsal sessions in the Wintergarden conservatory.
-                  </p>
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={claimTokens}
-                      disabled={!canClaim}
-                      className="rounded-[10px] bg-[#C9A53E] px-5 py-2 font-sans text-[0.875rem] font-semibold text-[#0F3D2E] disabled:opacity-50"
-                    >
-                      {canClaim ? `Claim ${DAILY_TOKENS} tokens` : 'Claimed today'}
-                    </button>
-                    <Link
-                      href="/wintergarden"
-                      className="rounded-[10px] border border-white/25 px-4 py-2 font-sans text-[0.875rem] font-semibold text-[#FAFCFB] no-underline"
-                    >
-                      Open Wintergarden
-                    </Link>
-                  </div>
-                </div>
+                <WintergardenIntelligence />
               </motion.div>
             ) : null}
 
