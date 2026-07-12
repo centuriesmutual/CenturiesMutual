@@ -644,16 +644,16 @@ export function SmartHomeSecurityModal({ className }: Props) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/* 4. eDocument System — Lease modal                                          */
+/* 4. Compound earnings — member-only growth                                  */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-const FIELDS: { l: string; v: string }[] = [
-  { l: 'Tenant', v: 'Maya Reyes' },
-  { l: 'Lessor', v: 'Cedar Park Holdings, LLC' },
-  { l: 'Property', v: '4218 Burnet Rd, Austin TX' },
-  { l: 'Term', v: '12 months · Sept 1, 2026 → Aug 31, 2027' },
-  { l: 'Monthly rent', v: '$1,640' },
-  { l: 'Security deposit', v: '$1,640 · Held in escrow' },
+const COMPOUND_FIELDS: { l: string; v: string }[] = [
+  { l: 'Member', v: 'Maya Reyes' },
+  { l: 'Program', v: 'Centuries Mutual Exclusive' },
+  { l: 'Principal', v: '$4,218.40' },
+  { l: 'Compound rate', v: '4.25% APY · Daily' },
+  { l: 'YTD growth', v: '+$186.40' },
+  { l: 'Next credit', v: 'Tonight · 11:59 PM CT' },
 ]
 
 export function EDocumentSystemModal({ className }: Props) {
@@ -661,14 +661,13 @@ export function EDocumentSystemModal({ className }: Props) {
     <WindowFrame
       className={className}
       eyebrow="Centuries Mutual"
-      title="Lease Agreement — TX-2024 Std"
-      badge={{ tone: 'gold', label: 'Sealed' }}
+      title="Compound Earnings — Member Only"
+      badge={{ tone: 'gold', label: 'Exclusive' }}
     >
       <div className="px-5 py-4">
-        {/* document title block */}
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <Eyebrow>Document</Eyebrow>
+            <Eyebrow>Growth ledger</Eyebrow>
             <h3
               className="mt-1 font-serif"
               style={{
@@ -679,38 +678,82 @@ export function EDocumentSystemModal({ className }: Props) {
                 letterSpacing: '-0.01em',
               }}
             >
-              Standard Residential Lease
+              Compound inside Centuries Mutual
             </h3>
             <p className="mt-1 font-sans text-[11px]" style={{ color: GRAY }}>
-              Doc ID · CM-LSE-00482 · Created May 12
+              Account · CM-CMP-00482 · Accruing since Jan 12
             </p>
           </div>
 
-          {/* gold seal */}
-          <div className="nb-seal-pulse relative h-12 w-12 shrink-0">
-            <svg viewBox="0 0 48 48" className="h-full w-full" aria-hidden>
-              <circle cx="24" cy="24" r="22" fill={PAPER} stroke={GOLD} strokeWidth="1.25" />
-              <circle cx="24" cy="24" r="14" fill="none" stroke={GOLD} strokeWidth="0.75" />
-              <path d="M24 14 L28 20 L24 26 L20 20 Z" fill={GOLD} />
-              <text
-                x="24"
-                y="36"
-                textAnchor="middle"
-                fontFamily="'Playfair Display', Georgia, serif"
-                fontSize="6"
-                fontWeight="600"
-                letterSpacing="0.18em"
-                fill={GREEN}
-              >
-                CM·SEAL
-              </text>
-            </svg>
+          <div
+            className="nb-seal-pulse flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border"
+            style={{ borderColor: GOLD, background: PAPER }}
+          >
+            <span
+              className="font-serif leading-none"
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                color: GREEN,
+                fontSize: '16px',
+                fontWeight: 700,
+              }}
+            >
+              4.25
+            </span>
+            <span className="font-sans text-[8px] font-bold uppercase tracking-[0.14em]" style={{ color: GOLD }}>
+              % APY
+            </span>
           </div>
         </div>
 
-        {/* fields */}
+        <div
+          className="mt-4 overflow-hidden rounded-xl border p-3"
+          style={{
+            borderColor: 'rgba(20,67,42,0.2)',
+            background: `linear-gradient(135deg, ${GREEN} 0%, #1A5938 55%, #0F3321 100%)`,
+            color: PAPER,
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'rgba(250,252,251,0.7)' }}>
+              Projected 12-month value
+            </span>
+            <Pill tone="gold">Member only</Pill>
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span
+              className="font-serif"
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: '28px',
+                fontWeight: 600,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              $4,402.18
+            </span>
+            <span className="font-sans text-[11px]" style={{ color: '#A7F3D0' }}>
+              +$183.78 if left to compound
+            </span>
+          </div>
+          <svg viewBox="0 0 280 48" className="mt-2 h-10 w-full" aria-hidden>
+            <path
+              d="M0 40 C 40 38, 60 36, 80 32 S 120 24, 140 20 S 180 14, 200 10 S 240 6, 280 2"
+              fill="none"
+              stroke={GOLD}
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="nb-title-line nb-title-line-animate"
+            />
+            <path
+              d="M0 40 C 40 38, 60 36, 80 32 S 120 24, 140 20 S 180 14, 200 10 S 240 6, 280 2 L 280 48 L 0 48 Z"
+              fill="rgba(201,165,62,0.18)"
+            />
+          </svg>
+        </div>
+
         <div className="mt-4 divide-y rounded-xl border bg-white" style={{ borderColor: BORDER }}>
-          {FIELDS.map((f) => (
+          {COMPOUND_FIELDS.map((f) => (
             <div key={f.l} className="flex items-center gap-3 px-3 py-2.5">
               <span
                 className="w-32 shrink-0 font-sans text-[10.5px] uppercase tracking-[0.16em]"
@@ -734,90 +777,20 @@ export function EDocumentSystemModal({ className }: Props) {
           ))}
         </div>
 
-        {/* signature block */}
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {/* tenant signature */}
-          <div className="rounded-xl border bg-white p-3" style={{ borderColor: BORDER }}>
-            <div className="flex items-center justify-between">
-              <Eyebrow>Tenant signature</Eyebrow>
-              <span className="font-sans text-[9px] uppercase tracking-[0.12em]" style={{ color: GOLD }}>
-                Signed
-              </span>
-            </div>
-            <svg viewBox="0 0 220 50" className="mt-1 h-12 w-full" aria-hidden>
-              <path
-                d="M6 38 C 24 8, 36 38, 50 22 S 78 12, 92 32 T 130 18 T 168 30 T 210 14"
-                fill="none"
-                stroke={GREEN}
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeDasharray="320"
-                strokeDashoffset="320"
-                className="nb-title-line nb-title-line-animate"
-                style={{ animationDuration: '1.4s' }}
-              />
-              <line x1="6" y1="44" x2="210" y2="44" stroke={BORDER} strokeWidth="0.75" />
-            </svg>
-            <div className="mt-1 flex items-center justify-between font-sans text-[10.5px]" style={{ color: GRAY }}>
-              <span>Maya Reyes</span>
-              <span className="font-mono">May 14 · 2:14 PM CDT</span>
-            </div>
-          </div>
-
-          {/* lessor signature */}
-          <div className="rounded-xl border bg-white p-3" style={{ borderColor: BORDER }}>
-            <div className="flex items-center justify-between">
-              <Eyebrow>Lessor signature</Eyebrow>
-              <span className="font-sans text-[9px] uppercase tracking-[0.12em]" style={{ color: GOLD }}>
-                Pending
-              </span>
-            </div>
-            <svg viewBox="0 0 220 50" className="mt-1 h-12 w-full" aria-hidden>
-              <line x1="6" y1="44" x2="210" y2="44" stroke={BORDER} strokeWidth="0.75" />
-              <text
-                x="12"
-                y="34"
-                fontFamily="'Playfair Display', Georgia, serif"
-                fontSize="14"
-                fontStyle="italic"
-                fill={GRAY}
-              >
-                Awaiting countersign…
-              </text>
-            </svg>
-            <div className="mt-1 flex items-center justify-between font-sans text-[10.5px]" style={{ color: GRAY }}>
-              <span>Cedar Park Holdings</span>
-              <span className="font-mono">Reminder sent</span>
-            </div>
-          </div>
-        </div>
-
-        {/* actions */}
         <div className="mt-4 flex items-center justify-between gap-3 pb-1">
-          <div className="flex items-center gap-2">
-            <Pill>Audit log: 14 events</Pill>
-            <Pill tone="gold">Notarized digitally</Pill>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill>Daily compound</Pill>
+            <Pill tone="gold">Exclusive to CM</Pill>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-hidden
-              className="rounded-lg border px-3 py-1.5 font-sans text-[11px] font-semibold"
-              style={{ borderColor: GREEN, color: GREEN }}
-            >
-              Save draft
-            </button>
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-hidden
-              className="rounded-lg px-3 py-1.5 font-sans text-[11px] font-semibold"
-              style={{ background: GREEN, color: PAPER }}
-            >
-              Send for signature
-            </button>
-          </div>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden
+            className="rounded-lg px-3 py-1.5 font-sans text-[11px] font-semibold"
+            style={{ background: GREEN, color: PAPER }}
+          >
+            Keep compounding
+          </button>
         </div>
       </div>
     </WindowFrame>
@@ -970,240 +943,143 @@ export function MemberTrustModal({ className }: Props) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/* 6. Roommate Directory — Yellow-Pages style                                 */
+/* 6. Rewards wallet attachment                                               */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-const DIRECTORY = [
+const REWARD_ROWS = [
   {
-    initials: 'MR',
-    name: 'Reyes, Maya',
-    age: 27,
-    occupation: 'Software designer',
-    area: 'Burnet Rd · 78757',
-    phone: '512 · 555 · 0124',
-    tags: ['Verified', 'Non-smoker', 'Pets ok'],
-    trust: 92,
-    accent: 'gold' as const,
+    label: 'On-time rent credit',
+    meta: 'Apr 1 · Cedar Park lease',
+    amount: '+$24.60',
+    tone: 'in' as const,
   },
   {
-    initials: 'DO',
-    name: 'Okafor, David',
-    age: 31,
-    occupation: 'Civil engineer',
-    area: 'Cedar Park · 78613',
-    phone: '512 · 555 · 0287',
-    tags: ['Verified', 'Quiet hours'],
-    trust: 88,
-    accent: 'green' as const,
+    label: 'Utilities autopay bonus',
+    meta: 'Mar 28 · Electric + water',
+    amount: '+$8.40',
+    tone: 'in' as const,
   },
   {
-    initials: 'LP',
-    name: 'Park, Lena',
-    age: 25,
-    occupation: 'Public-school teacher',
-    area: 'Hyde Park · 78751',
-    phone: '512 · 555 · 0341',
-    tags: ['Verified', 'Pets ok'],
-    trust: 90,
-    accent: 'green' as const,
+    label: 'Grocery checkout reward',
+    meta: 'Mar 22 · Household basket',
+    amount: '+$6.15',
+    tone: 'in' as const,
   },
 ]
-
-const ALPHABET = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 export function RoommateDirectoryModal({ className }: Props) {
   return (
     <WindowFrame
       className={className}
       eyebrow="Centuries Mutual"
-      title="Roommate Directory — Austin, TX"
-      badge={{ tone: 'gold', label: 'Vol. 24' }}
+      title="Rewards Wallet — Attached"
+      badge={{ tone: 'gold', label: 'Linked' }}
     >
-      <div
-        className="relative px-0 pt-0"
-        style={{
-          background: '#F4ECCB',
-          backgroundImage:
-            'repeating-linear-gradient(0deg, transparent 0px, transparent 22px, rgba(20,67,42,0.04) 22px, rgba(20,67,42,0.04) 23px)',
-        }}
-      >
-        {/* Masthead */}
-        <div
-          className="flex items-center justify-between gap-3 border-b px-5 py-3"
-          style={{ borderColor: 'rgba(20,67,42,0.18)' }}
-        >
-          <div className="flex items-baseline gap-2">
-            <span
-              className="font-serif"
+      <div className="px-5 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <Eyebrow>Account attachment</Eyebrow>
+            <h3
+              className="mt-1 font-serif"
               style={{
                 fontFamily: "'Playfair Display', Georgia, serif",
                 color: GREEN,
                 fontSize: '17px',
-                fontWeight: 700,
-                letterSpacing: '0.02em',
+                fontWeight: 600,
               }}
             >
-              Yellow Pages
+              Wallet clipped to your membership
+            </h3>
+            <p className="mt-1 font-sans text-[11px]" style={{ color: GRAY }}>
+              Maya Reyes · Member since Jan 2026
+            </p>
+          </div>
+          <Pill tone="gold">Supplemental</Pill>
+        </div>
+
+        <div
+          className="mt-4 rounded-xl border p-4"
+          style={{ borderColor: 'rgba(20,67,42,0.35)', background: GREEN, color: PAPER }}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'rgba(250,252,251,0.72)' }}>
+              Rewards balance
+            </span>
+            <span className="font-mono text-[10px]" style={{ color: GOLD }}>
+              ●●●● 7842
+            </span>
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span
+              className="font-serif"
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: '28px',
+                fontWeight: 600,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              $186.40
+            </span>
+            <span className="font-sans text-[11px]" style={{ color: '#A7F3D0' }}>
+              +$39.15 this month
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span
+              className="rounded-md px-2 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.12em]"
+              style={{ background: 'rgba(255,255,255,0.1)', color: PAPER }}
+            >
+              Attached to CM account
             </span>
             <span
-              className="font-sans text-[10.5px] uppercase tracking-[0.18em]"
-              style={{ color: '#8A6E1B' }}
+              className="rounded-md px-2 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.12em]"
+              style={{ background: 'rgba(201,165,62,0.22)', color: GOLD }}
             >
-              · Roommate listings
+              Earns on eligible activity
             </span>
-          </div>
-          <span className="font-sans text-[10.5px] uppercase tracking-[0.16em]" style={{ color: GREEN }}>
-            Page 1 / 4
-          </span>
-        </div>
-
-        {/* Search bar */}
-        <div className="px-5 pt-4">
-          <div
-            className="flex items-center gap-2 rounded-md border bg-white px-3 py-2 shadow-[0_1px_0_rgba(20,67,42,0.04)]"
-            style={{ borderColor: 'rgba(20,67,42,0.22)' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="11" cy="11" r="6.5" stroke={GREEN} strokeWidth="1.5" />
-              <path d="M20 20l-4-4" stroke={GREEN} strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <span className="font-sans text-[12px]" style={{ color: GREEN }}>
-              Find a roommate near you
-            </span>
-            <span className="ml-auto font-sans text-[10.5px]" style={{ color: GRAY }}>
-              City: <span style={{ color: GREEN, fontWeight: 600 }}>Austin, TX</span>
-            </span>
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-hidden
-              className="ml-2 rounded px-2.5 py-1 font-sans text-[10.5px] font-bold uppercase tracking-[0.14em]"
-              style={{ background: GREEN, color: PAPER }}
-            >
-              Browse
-            </button>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10.5px]" style={{ color: GRAY }}>
-            <span className="font-sans uppercase tracking-[0.16em]" style={{ color: '#8A6E1B' }}>
-              Listed under:
-            </span>
-            <Pill tone="green">Roommates</Pill>
-            <Pill tone="gold">Verified members</Pill>
-            <span className="font-mono">28 listings · Updated daily</span>
           </div>
         </div>
 
-        {/* Directory body w/ alphabet rail */}
-        <div className="grid grid-cols-[34px_1fr] gap-0">
-          <div className="flex flex-col items-center gap-[1px] border-r py-3" style={{ borderColor: 'rgba(20,67,42,0.18)' }}>
-            {ALPHABET.map((l) => (
-              <span
-                key={l}
-                className="font-mono text-[10px]"
-                style={{
-                  color: l === 'O' || l === 'P' || l === 'R' ? GREEN : '#8A6E1B',
-                  fontWeight: l === 'R' ? 700 : 500,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                {l}
-              </span>
-            ))}
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <Eyebrow>Recent accruals</Eyebrow>
+            <span className="font-sans text-[10px] uppercase tracking-[0.14em]" style={{ color: GRAY }}>
+              Updated daily
+            </span>
           </div>
-
-          <div className="px-4 py-3">
-            <div
-              className="mb-2 flex items-baseline justify-between border-b pb-1.5"
-              style={{ borderColor: 'rgba(20,67,42,0.22)' }}
-            >
-              <span
-                className="font-serif"
-                style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
-                  color: GREEN,
-                  fontSize: '15px',
-                  fontWeight: 600,
-                }}
-              >
-                R — Listings
-              </span>
-              <span className="font-sans text-[10px] uppercase tracking-[0.18em]" style={{ color: '#8A6E1B' }}>
-                Sort A → Z
-              </span>
-            </div>
-
-            <div className="divide-y" style={{ borderColor: 'rgba(20,67,42,0.16)' }}>
-              {DIRECTORY.map((d, i) => (
-                <div key={d.name} className="flex items-center gap-3 py-2.5">
-                  <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded font-sans text-[11px] font-bold"
-                    style={{
-                      background: d.accent === 'gold' ? GOLD : GREEN,
-                      color: PAPER,
-                      boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.18)',
-                    }}
-                  >
-                    {d.initials}
+          <div className="divide-y rounded-xl border bg-white" style={{ borderColor: BORDER }}>
+            {REWARD_ROWS.map((r) => (
+              <div key={r.label} className="flex items-center gap-3 px-3 py-2.5">
+                <span
+                  className="grid h-7 w-7 place-items-center rounded-full font-sans text-[12px] font-bold"
+                  style={{ background: 'rgba(20,67,42,0.08)', color: GREEN }}
+                >
+                  +
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-sans text-[12.5px] font-semibold" style={{ color: GREEN }}>
+                    {r.label}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span
-                        className="truncate font-serif"
-                        style={{
-                          fontFamily: "'Playfair Display', Georgia, serif",
-                          color: GREEN,
-                          fontSize: '14px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {d.name}
-                      </span>
-                      <span className="font-sans text-[10.5px]" style={{ color: GRAY }}>
-                        — {d.occupation}, {d.age}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-sans text-[10.5px]">
-                      <span style={{ color: GRAY }}>📍 {d.area}</span>
-                      <span className="font-mono" style={{ color: GREEN }}>
-                        ☎ {d.phone}
-                      </span>
-                      {d.tags.map((t) => (
-                        <span key={t} className="uppercase tracking-[0.12em]" style={{ color: '#8A6E1B', fontWeight: 600 }}>
-                          · {t}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <span
-                      className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em]"
-                      style={{ color: i === 0 ? GOLD : GREEN }}
-                    >
-                      Trust {d.trust}
-                    </span>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-hidden
-                      className="rounded border px-2.5 py-1 font-sans text-[10.5px] font-semibold"
-                      style={{ borderColor: GREEN, color: GREEN, background: 'transparent' }}
-                    >
-                      Contact
-                    </button>
+                  <div className="font-sans text-[10.5px]" style={{ color: GRAY }}>
+                    {r.meta}
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-3 flex items-center justify-between border-t pt-2" style={{ borderColor: 'rgba(20,67,42,0.18)' }}>
-              <span className="font-sans text-[10.5px] uppercase tracking-[0.16em]" style={{ color: '#8A6E1B' }}>
-                Continued on next page →
-              </span>
-              <span className="font-mono text-[10px]" style={{ color: GRAY }}>
-                Vol. 24 · Spring Issue
-              </span>
-            </div>
+                <span className="font-mono text-[12px] font-semibold" style={{ color: GREEN }}>
+                  {r.amount}
+                </span>
+              </div>
+            ))}
           </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between border-t pt-3" style={{ borderColor: BORDER }}>
+          <span className="font-sans text-[10.5px] uppercase tracking-[0.14em]" style={{ color: GRAY }}>
+            Status · Attached &amp; accruing
+          </span>
+          <span className="font-sans text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: GOLD }}>
+            Manage wallet →
+          </span>
         </div>
       </div>
     </WindowFrame>
@@ -1211,50 +1087,39 @@ export function RoommateDirectoryModal({ className }: Props) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/* 7. Twitter / X feed                                                        */
+/* 7. Pay — Rent / Bills / Groceries                                          */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-const POSTS = [
+const PAY_TABS = ['Rent', 'Bills', 'Groceries'] as const
+
+const PAY_SCHEDULE = [
   {
-    initials: 'CM',
-    name: 'Centuries Mutual',
-    handle: '@centuriesmutual',
-    time: '2h',
-    verified: true,
-    body: 'Your corridor moves at the speed of trust. New verified listings posted in Austin · Cedar Park this week — every one notarized, every record sealed.',
-    likes: '1.2K',
-    reposts: 184,
-    replies: 42,
+    kind: 'Rent',
+    payee: 'Cedar Park Holdings, LLC',
+    amount: '$1,640.00',
+    due: 'Due Apr 1',
+    status: 'Scheduled',
   },
   {
-    initials: 'MR',
-    name: 'Maya Reyes',
-    handle: '@maya.in.atx',
-    time: '6h',
-    verified: true,
-    body: 'Signed my lease through Centuries Mutual today. Three roommates, one ledger, zero spreadsheets. The audit log alone is worth it.',
-    likes: 318,
-    reposts: 47,
-    replies: 19,
-    hasCard: true,
+    kind: 'Electric',
+    payee: 'Austin Energy',
+    amount: '$112.40',
+    due: 'Due Mar 28',
+    status: 'Ready',
   },
   {
-    initials: 'DO',
-    name: 'David Okafor',
-    handle: '@dokafor',
-    time: '1d',
-    verified: false,
-    body: 'My corridor newspaper just dropped — three new neighbors verified, two block events on the calendar. Reading it like a Sunday paper. ☕',
-    likes: 92,
-    reposts: 14,
-    replies: 6,
+    kind: 'Groceries',
+    payee: 'Household basket',
+    amount: '$84.15',
+    due: 'Checkout open',
+    status: 'Draft',
   },
 ]
 
-const TRENDS = [
-  { topic: 'Austin Corridor', volume: '2,418 posts' },
-  { topic: 'Verified Leases', volume: '982 posts' },
-  { topic: '#TrustScores', volume: '614 posts' },
+const RECENT_PAYS = [
+  { label: 'Rent · Mar', amount: '−$1,640.00', meta: 'Mar 1' },
+  { label: 'Water · Q1', amount: '−$64.20', meta: 'Mar 12' },
+  { label: 'Groceries · H-E-B', amount: '−$97.80', meta: 'Mar 18' },
 ]
 
 export function TwitterFeedModal({ className }: Props) {
@@ -1262,18 +1127,16 @@ export function TwitterFeedModal({ className }: Props) {
     <WindowFrame
       className={className}
       eyebrow="Centuries Mutual"
-      title="Network — For You"
+      title="Pay — Rent, Bills & Groceries"
       badge={{ tone: 'live', label: 'Live' }}
     >
-      <div className="grid grid-cols-1 sm:grid-cols-[1.6fr_1fr]">
-        {/* Feed */}
+      <div className="grid grid-cols-1 sm:grid-cols-[1.55fr_1fr]">
         <div className="border-r" style={{ borderColor: BORDER }}>
-          {/* tab bar */}
           <div
-            className="sticky top-0 z-[1] flex items-center justify-between border-b bg-white px-4"
+            className="flex items-center justify-between border-b bg-white px-4"
             style={{ borderColor: BORDER }}
           >
-            {['For you', 'Following', 'Corridor'].map((t, i) => (
+            {PAY_TABS.map((t, i) => (
               <button
                 key={t}
                 type="button"
@@ -1293,188 +1156,120 @@ export function TwitterFeedModal({ className }: Props) {
             ))}
           </div>
 
-          {/* Composer */}
-          <div className="flex items-start gap-3 border-b px-4 py-3" style={{ borderColor: BORDER }}>
-            <Avatar initials="YOU" />
-            <div className="flex-1">
-              <div className="font-sans text-[13px]" style={{ color: GRAY }}>
-                What&apos;s happening in your corridor?
+          <div className="px-4 py-3">
+            <div
+              className="rounded-xl border p-3"
+              style={{ borderColor: BORDER, background: '#FAFCFB' }}
+            >
+              <Eyebrow>Next rent</Eyebrow>
+              <div className="mt-1 flex items-baseline justify-between gap-2">
+                <span
+                  className="font-serif"
+                  style={{
+                    fontFamily: "'Playfair Display', Georgia, serif",
+                    color: GREEN,
+                    fontSize: '24px',
+                    fontWeight: 600,
+                  }}
+                >
+                  $1,640.00
+                </span>
+                <span className="font-sans text-[11px]" style={{ color: GRAY }}>
+                  Cedar Park · Apr 1
+                </span>
               </div>
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex gap-3 font-sans text-[11px]" style={{ color: GREEN }}>
-                  <span>📷 Photo</span>
-                  <span>📍 Place</span>
-                  <span>📊 Poll</span>
-                </div>
+              <div className="mt-3 flex gap-2">
                 <button
                   type="button"
                   tabIndex={-1}
                   aria-hidden
-                  className="rounded-full px-3.5 py-1.5 font-sans text-[11.5px] font-bold"
+                  className="rounded-lg px-3 py-1.5 font-sans text-[11px] font-semibold"
                   style={{ background: GREEN, color: PAPER }}
                 >
-                  Post
+                  Pay now
+                </button>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden
+                  className="rounded-lg border px-3 py-1.5 font-sans text-[11px] font-semibold"
+                  style={{ borderColor: GREEN, color: GREEN }}
+                >
+                  Keep scheduled
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* Posts */}
-          <div className="divide-y" style={{ borderColor: BORDER }}>
-            {POSTS.map((p, i) => (
-              <article key={p.handle} className="flex gap-3 px-4 py-3">
-                <Avatar initials={p.initials} tone={i === 0 ? 'gold' : 'green'} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 font-sans text-[12.5px]">
-                    <span className="font-semibold" style={{ color: GREEN }}>
-                      {p.name}
-                    </span>
-                    {p.verified && (
-                      <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden>
-                        <path
-                          fill={GOLD}
-                          d="M12 2l2.4 2.2 3.2-.4.4 3.2L20.2 9 18 12l2.2 2.4-2.6 1.8.4 3.2-3.2.4L12 22l-2.4-2.2-3.2.4-.4-3.2L3.8 15 6 12 3.8 9.6l2.6-1.8-.4-3.2 3.2-.4z"
-                        />
-                        <path d="M9 12l2 2 4-5" stroke="#0F3321" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                    <span style={{ color: GRAY }}>{p.handle}</span>
-                    <span style={{ color: GRAY }}>· {p.time}</span>
-                  </div>
-                  <p
-                    className="mt-1 font-sans text-[13px] leading-snug"
-                    style={{ color: '#1F2A24' }}
-                  >
-                    {p.body}
-                  </p>
-
-                  {p.hasCard && (
-                    <div
-                      className="mt-2 overflow-hidden rounded-xl border"
-                      style={{ borderColor: BORDER }}
-                    >
-                      <div
-                        className="h-20 w-full"
-                        style={{
-                          background:
-                            'linear-gradient(120deg, rgba(20,67,42,0.85) 0%, rgba(20,67,42,0.55) 60%, rgba(201,165,62,0.85) 100%)',
-                        }}
-                        aria-hidden
-                      />
-                      <div className="flex items-center justify-between gap-3 p-3">
-                        <div>
-                          <div className="font-sans text-[10.5px] uppercase tracking-[0.16em]" style={{ color: '#8A6E1B' }}>
-                            centuriesmutual.com
-                          </div>
-                          <div className="font-sans text-[12.5px] font-semibold" style={{ color: GREEN }}>
-                            Lease — Cedar Park, sealed Feb 1
-                          </div>
-                          <div className="font-sans text-[11px]" style={{ color: GRAY }}>
-                            Audit log · 14 events · Yours to keep
-                          </div>
-                        </div>
-                        <span className="font-sans text-[10px] uppercase tracking-[0.14em]" style={{ color: GOLD }}>
-                          View →
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* action bar */}
+            <div className="mt-3 space-y-2">
+              {PAY_SCHEDULE.map((p) => (
+                <div
+                  key={p.payee + p.kind}
+                  className="flex items-center gap-3 rounded-xl border bg-white px-3 py-2.5"
+                  style={{ borderColor: BORDER }}
+                >
                   <div
-                    className="mt-2 flex max-w-md items-center justify-between font-sans text-[11px]"
-                    style={{ color: GRAY }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-sans text-[10px] font-bold uppercase tracking-[0.06em]"
+                    style={{ background: 'rgba(20,67,42,0.08)', color: GREEN }}
                   >
-                    <span className="flex items-center gap-1">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <path d="M21 12a8 8 0 0 1-12 7l-5 1 1-5a8 8 0 1 1 16-3z" stroke={GRAY} strokeWidth="1.4" />
-                      </svg>
-                      {p.replies}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <path d="M7 7h10l-2-2M17 17H7l2 2" stroke={GRAY} strokeWidth="1.4" strokeLinecap="round" />
-                      </svg>
-                      {p.reposts}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <path
-                          d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"
-                          stroke={i === 0 ? GOLD : GRAY}
-                          strokeWidth="1.4"
-                          fill={i === 0 ? 'rgba(201,165,62,0.18)' : 'none'}
-                        />
-                      </svg>
-                      <span style={{ color: i === 0 ? GOLD : GRAY }}>{p.likes}</span>
-                    </span>
-                    <span>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <path d="M5 5v16l7-5 7 5V5z" stroke={GRAY} strokeWidth="1.4" />
-                      </svg>
-                    </span>
-                    <span>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <path d="M4 12h16M12 4v16" stroke={GRAY} strokeWidth="1.4" strokeLinecap="round" />
-                      </svg>
-                    </span>
+                    {p.kind.slice(0, 2)}
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-
-        {/* Trends rail */}
-        <aside className="hidden flex-col gap-3 px-4 py-3 sm:flex">
-          <div
-            className="rounded-xl border bg-white p-3"
-            style={{ borderColor: BORDER }}
-          >
-            <Eyebrow>Trending in your corridor</Eyebrow>
-            <div className="mt-2 space-y-3">
-              {TRENDS.map((t) => (
-                <div key={t.topic}>
-                  <div className="font-sans text-[12.5px] font-semibold" style={{ color: GREEN }}>
-                    {t.topic}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-sans text-[12.5px] font-semibold" style={{ color: GREEN }}>
+                      {p.payee}
+                    </div>
+                    <div className="font-sans text-[10.5px]" style={{ color: GRAY }}>
+                      {p.kind} · {p.due}
+                    </div>
                   </div>
-                  <div className="font-mono text-[10.5px]" style={{ color: GRAY }}>
-                    {t.volume}
+                  <div className="text-right">
+                    <div className="font-mono text-[12px] font-semibold" style={{ color: GREEN }}>
+                      {p.amount}
+                    </div>
+                    <div className="font-sans text-[9.5px] uppercase tracking-[0.12em]" style={{ color: GOLD }}>
+                      {p.status}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+        </div>
 
-          <div
-            className="rounded-xl border p-3"
-            style={{ borderColor: BORDER, background: '#FAFCFB' }}
-          >
-            <Eyebrow>Who to follow</Eyebrow>
+        <aside className="flex flex-col gap-3 px-4 py-3">
+          <div className="rounded-xl border bg-white p-3" style={{ borderColor: BORDER }}>
+            <Eyebrow>Wallet available</Eyebrow>
+            <div
+              className="mt-1 font-serif"
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                color: GREEN,
+                fontSize: '22px',
+                fontWeight: 600,
+              }}
+            >
+              $4,218.40
+            </div>
+            <p className="mt-1 font-sans text-[11px]" style={{ color: GRAY }}>
+              Ready for rent, bills, or groceries
+            </p>
+          </div>
+
+          <div className="rounded-xl border p-3" style={{ borderColor: BORDER, background: '#FAFCFB' }}>
+            <Eyebrow>Recent sends</Eyebrow>
             <div className="mt-2 space-y-2">
-              {[
-                { i: 'NA', n: 'North Austin Corridor', h: '@nax.corridor' },
-                { i: 'CP', n: 'Cedar Park Hosts', h: '@cphosts' },
-              ].map((u) => (
-                <div key={u.h} className="flex items-center gap-2">
-                  <Avatar initials={u.i} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-sans text-[12px] font-semibold" style={{ color: GREEN }}>
-                      {u.n}
+              {RECENT_PAYS.map((r) => (
+                <div key={r.label} className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="font-sans text-[12px] font-semibold" style={{ color: GREEN }}>
+                      {r.label}
                     </div>
-                    <div className="truncate font-sans text-[10.5px]" style={{ color: GRAY }}>
-                      {u.h}
+                    <div className="font-mono text-[10px]" style={{ color: GRAY }}>
+                      {r.meta}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    aria-hidden
-                    className="rounded-full border px-2.5 py-1 font-sans text-[10.5px] font-bold"
-                    style={{ borderColor: GREEN, color: GREEN }}
-                  >
-                    Follow
-                  </button>
+                  <span className="font-mono text-[11px]" style={{ color: GRAY }}>
+                    {r.amount}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1486,37 +1281,29 @@ export function TwitterFeedModal({ className }: Props) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/* 8. Treasury — Calendar / Notes / Messages / Wallet                         */
+/* 8. Fitness — My Brother's Keeper integration                               */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-const NOTES = [
-  { done: true, text: 'Confirm move-in walkthrough', meta: 'Today · 3:00 PM' },
-  { done: true, text: 'Sign deposit escrow release', meta: 'Yesterday' },
-  { done: false, text: 'Update beneficiary on policy', meta: 'Due Fri' },
-  { done: false, text: 'Reconcile April utilities', meta: 'Apr 30' },
+const WORKOUTS = [
+  { done: true, text: 'Morning run · 3.2 mi', meta: 'Today · 6:40 AM' },
+  { done: true, text: 'Strength · upper body', meta: 'Yesterday' },
+  { done: false, text: 'Mobility · 20 min', meta: 'Due today' },
+  { done: false, text: 'Zone 2 bike · 45 min', meta: 'Fri goal' },
 ]
 
-const MESSAGES_PREVIEW = [
-  { initials: 'MR', name: 'Maya Reyes', preview: 'I’ll bring the lease draft.', time: '2m', tone: 'gold' as const },
-  { initials: 'CP', name: 'Cedar Park HOA', preview: 'Q2 statement is ready', time: '1h', tone: 'green' as const },
-  { initials: 'CM', name: 'Concierge', preview: 'Your trust score updated', time: '3h', tone: 'green' as const },
+const SYNC_EVENTS = [
+  { initials: 'MB', name: 'My Brother’s Keeper', preview: 'Weekly plan synced', time: '2m', tone: 'gold' as const },
+  { initials: 'CM', name: 'Centuries Mutual', preview: 'Fitness credit queued', time: '1h', tone: 'green' as const },
+  { initials: 'MR', name: 'Maya Reyes', preview: 'Streak: 12 days', time: '3h', tone: 'green' as const },
 ]
 
-const TXNS = [
-  { label: 'Rent · Cedar Park, LLC', amount: '−$1,640.00', meta: 'Apr 1', tone: 'out' as const },
-  { label: 'Deposit released to escrow', amount: '+$1,640.00', meta: 'Mar 28', tone: 'in' as const },
-  { label: 'Utilities split — settled', amount: '−$184.20', meta: 'Mar 25', tone: 'out' as const },
-]
-
-function MiniCalendar() {
-  const days = Array.from({ length: 30 }, (_, i) => i + 1)
-  const today = 14
-  const events = new Set([3, 9, 14, 19, 27])
-
+function FitnessWeek() {
+  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const active = new Set([0, 1, 2, 3, 5])
   return (
     <div className="rounded-xl border bg-white p-3" style={{ borderColor: BORDER }}>
       <div className="flex items-center justify-between">
-        <Eyebrow>Calendar</Eyebrow>
+        <Eyebrow>This week</Eyebrow>
         <span
           className="font-serif"
           style={{
@@ -1526,65 +1313,46 @@ function MiniCalendar() {
             fontWeight: 600,
           }}
         >
-          April 2026
+          Apr 6–12
         </span>
       </div>
-      <div className="mt-2 grid grid-cols-7 gap-1 font-sans text-[10px] uppercase tracking-[0.1em]" style={{ color: GRAY }}>
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-          <span key={`h-${i}`} className="text-center">
-            {d}
-          </span>
-        ))}
-      </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
-        {/* offset for April 2026 (Wed start) */}
-        {Array.from({ length: 3 }).map((_, i) => (
-          <span key={`o-${i}`} aria-hidden />
-        ))}
-        {days.map((d) => {
-          const active = d === today
-          const isEvent = events.has(d)
-          return (
+      <div className="mt-3 grid grid-cols-7 gap-1.5">
+        {days.map((d, i) => (
+          <div key={`${d}-${i}`} className="flex flex-col items-center gap-1.5">
+            <span className="font-sans text-[10px] uppercase tracking-[0.1em]" style={{ color: GRAY }}>
+              {d}
+            </span>
             <span
-              key={d}
-              className="relative grid h-6 place-items-center rounded text-center font-sans text-[11px]"
+              className="grid h-8 w-8 place-items-center rounded-full font-sans text-[11px] font-semibold"
               style={{
-                background: active ? GREEN : 'transparent',
-                color: active ? PAPER : GREEN,
-                fontWeight: active ? 700 : 500,
+                background: active.has(i) ? GREEN : 'rgba(20,67,42,0.06)',
+                color: active.has(i) ? PAPER : GREEN,
               }}
             >
-              {d}
-              {isEvent && !active && (
-                <span
-                  aria-hidden
-                  className="absolute bottom-0.5 h-1 w-1 rounded-full"
-                  style={{ background: GOLD }}
-                />
-              )}
+              {active.has(i) ? '✓' : '·'}
             </span>
-          )
-        })}
+          </div>
+        ))}
       </div>
       <div className="mt-2 flex items-center justify-between font-sans text-[10.5px]" style={{ color: GRAY }}>
-        <span>· 5 events this month</span>
-        <span style={{ color: GOLD }}>Today: Move-in walkthrough</span>
+        <span>· 5 of 7 days logged</span>
+        <span style={{ color: GOLD }}>Streak · 12 days</span>
       </div>
     </div>
   )
 }
 
-function NotesCard() {
+function WorkoutPlan() {
   return (
     <div className="rounded-xl border bg-white p-3" style={{ borderColor: BORDER }}>
       <div className="flex items-center justify-between">
-        <Eyebrow>Notes & tasks</Eyebrow>
+        <Eyebrow>Workout plan</Eyebrow>
         <span className="font-sans text-[10px]" style={{ color: GRAY }}>
-          4 items · 2 done
+          Via mybrotherskeeper.cc
         </span>
       </div>
       <ul className="mt-2 space-y-1.5">
-        {NOTES.map((n) => (
+        {WORKOUTS.map((n) => (
           <li key={n.text} className="flex items-center gap-2">
             <span
               aria-hidden
@@ -1616,17 +1384,17 @@ function NotesCard() {
   )
 }
 
-function MessagesCard() {
+function SyncFeed() {
   return (
     <div className="rounded-xl border bg-white p-3" style={{ borderColor: BORDER }}>
       <div className="flex items-center justify-between">
-        <Eyebrow>Messages</Eyebrow>
+        <Eyebrow>Sync feed</Eyebrow>
         <span className="font-sans text-[10px]" style={{ color: GRAY }}>
-          3 unread
+          Connected
         </span>
       </div>
       <div className="mt-2 space-y-2">
-        {MESSAGES_PREVIEW.map((m) => (
+        {SYNC_EVENTS.map((m) => (
           <div key={m.name} className="flex items-center gap-2">
             <Avatar initials={m.initials} tone={m.tone} />
             <div className="min-w-0 flex-1">
@@ -1650,7 +1418,7 @@ function MessagesCard() {
   )
 }
 
-function WalletCard() {
+function FitnessRewardsCard() {
   return (
     <div
       className="rounded-xl border p-3"
@@ -1661,13 +1429,13 @@ function WalletCard() {
           className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'rgba(250,252,251,0.72)' }}
         >
-          Wallet
+          Fitness → rewards
         </span>
         <span
           className="font-sans text-[9.5px] font-bold uppercase tracking-[0.16em]"
           style={{ color: GOLD }}
         >
-          ●●●● 4218
+          MBK linked
         </span>
       </div>
       <div className="mt-1.5 flex items-baseline gap-2">
@@ -1681,49 +1449,35 @@ function WalletCard() {
             letterSpacing: '-0.01em',
           }}
         >
-          $4,218.40
+          +$18.50
         </span>
         <span className="font-sans text-[10.5px]" style={{ color: 'rgba(250,252,251,0.7)' }}>
-          available
+          this week
         </span>
       </div>
-      <div
-        className="mt-2 divide-y rounded-lg"
-        style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.1)' }}
-      >
-        {TXNS.map((t) => (
-          <div key={t.label} className="flex items-center gap-2 px-2.5 py-1.5">
-            <span
-              className="grid h-5 w-5 place-items-center rounded-full"
-              style={{
-                background:
-                  t.tone === 'in'
-                    ? 'rgba(34,197,94,0.18)'
-                    : 'rgba(255,255,255,0.08)',
-                color: t.tone === 'in' ? '#A7F3D0' : '#E5E7EB',
-              }}
-            >
-              {t.tone === 'in' ? '+' : '−'}
-            </span>
-            <span className="flex-1 truncate font-sans text-[11px]">{t.label}</span>
-            <span className="font-mono text-[10.5px]" style={{ color: t.tone === 'in' ? '#A7F3D0' : '#E5E7EB' }}>
-              {t.amount}
-            </span>
-            <span className="font-mono text-[10px]" style={{ color: 'rgba(250,252,251,0.6)' }}>
-              {t.meta}
+      <div className="mt-3 space-y-1.5">
+        {[
+          { label: 'Run streak bonus', amount: '+$8.00' },
+          { label: 'Strength sessions ×3', amount: '+$6.50' },
+          { label: 'Weekly goal met', amount: '+$4.00' },
+        ].map((row) => (
+          <div key={row.label} className="flex items-center justify-between font-sans text-[11px]">
+            <span style={{ color: 'rgba(250,252,251,0.85)' }}>{row.label}</span>
+            <span className="font-mono" style={{ color: '#A7F3D0' }}>
+              {row.amount}
             </span>
           </div>
         ))}
       </div>
       <div className="mt-2 flex items-center justify-between">
         <span className="font-sans text-[10px] uppercase tracking-[0.14em]" style={{ color: 'rgba(250,252,251,0.6)' }}>
-          Treasury · Apr ledger
+          mybrotherskeeper.cc
         </span>
         <span
           className="font-sans text-[10px] font-bold uppercase tracking-[0.14em]"
           style={{ color: GOLD }}
         >
-          Reconcile →
+          Open app →
         </span>
       </div>
     </div>
@@ -1734,15 +1488,15 @@ export function TreasuryModal({ className }: Props) {
   return (
     <WindowFrame
       className={className}
-      eyebrow="Centuries Mutual"
-      title="Treasury — Daily Operations"
+      eyebrow="Centuries Mutual × MBK"
+      title="Fitness — My Brother’s Keeper"
       badge={{ tone: 'live', label: 'Synced' }}
     >
       <div className="grid grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2">
-        <MiniCalendar />
-        <NotesCard />
-        <MessagesCard />
-        <WalletCard />
+        <FitnessWeek />
+        <WorkoutPlan />
+        <SyncFeed />
+        <FitnessRewardsCard />
       </div>
 
       <div
@@ -1750,10 +1504,10 @@ export function TreasuryModal({ className }: Props) {
         style={{ borderColor: BORDER, background: '#F1F3F2' }}
       >
         <span className="font-sans text-[10.5px] uppercase tracking-[0.14em]" style={{ color: GRAY }}>
-          Auto-reconciled · 04:14 UTC
+          Last sync · 04:14 UTC
         </span>
         <span className="font-sans text-[10.5px] uppercase tracking-[0.14em]" style={{ color: GOLD }}>
-          Open Treasury →
+          mybrotherskeeper.cc →
         </span>
       </div>
     </WindowFrame>

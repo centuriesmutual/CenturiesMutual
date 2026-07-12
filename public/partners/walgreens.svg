@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Walgreens">
+  <rect width="64" height="64" rx="14" fill="#E31837"/>
+  <!-- Stylized W mark -->
+  <path fill="#fff" d="M10 18h7.2l4.4 18.2L28.2 18h7.6l6.6 18.2L47 18H54l-9.8 28H36.4L30 26.4 23.6 46H15.8L10 18z"/>
+</svg>

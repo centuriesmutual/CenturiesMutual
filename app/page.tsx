@@ -1,7 +1,7 @@
-import BlockchainSection from '../components/BlockchainSection'
-import NetworkDevices from '../components/NetworkDevices'
-import SmartHomeSecurity from '../components/SmartHomeSecurity'
-import Legacy from '../components/Legacy'
+import HealthInsuranceWallet from '../components/HealthInsuranceWallet'
+import HealthInsurancePay from '../components/HealthInsurancePay'
+import HealthInsuranceWellness from '../components/HealthInsuranceWellness'
+import HealthInsuranceLegacy from '../components/HealthInsuranceLegacy'
 import Footer from '../components/Footer'
 import { SiteHeader } from '../components/layout/site-header'
 import { CommunityHero } from '../components/hero/community-hero'
@@ -12,10 +12,10 @@ export default function Home() {
       <SiteHeader />
       <main className="m-0 block bg-transparent p-0">
         <CommunityHero />
-        <BlockchainSection />
-        <NetworkDevices />
-        <SmartHomeSecurity />
-        <Legacy />
+        <HealthInsuranceWallet />
+        <HealthInsurancePay />
+        <HealthInsuranceWellness />
+        <HealthInsuranceLegacy />
         <Footer />
       </main>
     </>

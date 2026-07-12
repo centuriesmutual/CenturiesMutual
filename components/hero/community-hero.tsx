@@ -1,13 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Fraunces } from 'next/font/google'
-import { CommunitySearchBar } from '@/components/search/community-search-bar'
-import { CommunitySearchHotkeys, CommunitySearchModal } from '@/components/search/community-search-modal'
-import { HeroEditorialCarousel } from '@/components/hero/hero-editorial-carousel'
-import { QuickActions, COMMUNITY_HERO_QUICK_ITEMS } from '@/components/hero/quick-actions'
 import { fadeUp } from '@/lib/animations'
 import { GRAIN_BG } from '@/components/layout/site-header'
 
@@ -45,16 +41,11 @@ function TopoPattern({ className = '' }: { className?: string }) {
 }
 
 const portalShadow = 'shadow-[0_8px_32px_-8px_rgba(0,0,0,0.25)]'
-export function CommunityHero() {
-  const [searchOpen, setSearchOpen] = useState(false)
-  const openSearch = useCallback(() => setSearchOpen(true), [])
 
+export function CommunityHero() {
   return (
     <section className={`relative mt-0 w-full overflow-hidden bg-[#0F3D2E] pb-8 pt-0 lg:pb-12 ${editorial.variable}`}>
-      <CommunitySearchHotkeys onOpen={openSearch} />
-
       <div className="relative z-[1] grid min-h-[94vh] w-full grid-cols-1 gap-0 lg:min-h-[98vh] lg:grid-cols-12 lg:gap-0">
-        {/* Columns 1–7: image column */}
         <div className="relative col-span-full min-h-[min(52vh,520px)] overflow-hidden lg:col-span-7 lg:col-start-1 lg:min-h-[88vh]">
           <div className="absolute inset-0">
             <Image
@@ -73,7 +64,6 @@ export function CommunityHero() {
           />
         </div>
 
-        {/* Columns 8–12: editorial tan column */}
         <div className="relative col-span-full flex min-h-0 flex-col bg-[#E8DFD6] lg:col-span-5 lg:col-start-8 lg:min-h-[88vh]">
           <div
             aria-hidden
@@ -96,64 +86,60 @@ export function CommunityHero() {
             animate="show"
             className="relative z-[1] flex flex-1 flex-col justify-center px-8 py-8 lg:px-12 lg:py-12"
           >
-            <div>
-              <p className="mb-3 font-sans text-[10px] font-medium uppercase tracking-[0.25em] text-[#C9A961]">
-                — Est. 2024
-              </p>
-              <h1
-                className={`mb-8 max-w-md text-3xl font-medium tracking-tight text-[#0F3D2E] md:text-4xl lg:max-w-none lg:text-[2.65rem] lg:whitespace-nowrap`}
-                style={{ fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif', lineHeight: 1.18 }}
-              >
-                <span>Your Community Brokerage</span>
-              </h1>
-            </div>
+            <p className="mb-4 font-sans text-[10px] font-medium uppercase tracking-[0.25em] text-[#C9A961]">
+              — Est. 2024 · USA
+            </p>
 
             <div
-              className={`mb-3 overflow-hidden rounded-2xl border border-warm-border bg-cream px-4 py-3 sm:px-5 ${portalShadow}`}
+              className={`relative overflow-hidden rounded-2xl border border-[#E5E0D5] bg-[#F7F3EE] ${portalShadow}`}
             >
-              <CommunitySearchBar onOpen={openSearch} compact />
-            </div>
-
-            <QuickActions className="mb-6" items={COMMUNITY_HERO_QUICK_ITEMS} />
-
-            <div
-              id="client-portal"
-              className={`relative mb-0 overflow-hidden rounded-2xl border border-[#E5E0D5]/90 ${portalShadow}`}
-            >
-              <div className="absolute inset-0 overflow-hidden">
-                <Image
-                  src="/buffalo2.png"
-                  alt=""
-                  fill
-                  priority={false}
-                  sizes="(max-width: 1023px) 100vw, 42vw"
-                  className="object-cover object-[50%_5%] scale-[1.55] origin-top"
-                />
-              </div>
-              <div
-                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/5 to-black/15"
-                aria-hidden
-              />
-
-              {/* YouTube housing — tight black surround, low top/bottom padding */}
-              <div className="relative z-[1] flex w-full items-center justify-center px-3 py-3 sm:px-4 sm:py-4">
-                <div className="w-full max-w-[36rem]">
-                  <div className="relative overflow-hidden rounded-[14px] bg-black p-[6px] shadow-[0_28px_64px_-16px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-black/60 sm:p-[7px]">
-                    <div className="relative w-full overflow-hidden rounded-[9px] bg-black aspect-[16/10]">
-                      <HeroEditorialCarousel
-                        className="absolute inset-0 h-full w-full rounded-none border-0 shadow-none"
-                        controlsClassName="bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3"
-                      />
-                    </div>
-                  </div>
+              <div className="relative z-[1] px-6 py-7 sm:px-8 sm:py-8">
+                <p className="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C9A961]">
+                  Centuries Mutual
+                </p>
+                <h1
+                  className="mb-3 max-w-md font-medium tracking-tight text-[#0F3D2E]"
+                  style={{
+                    fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif',
+                    fontSize: 'clamp(1.75rem, 3.2vw, 2.35rem)',
+                    lineHeight: 1.18,
+                  }}
+                >
+                  Your Community Brokerage
+                </h1>
+                <h2
+                  className="mb-3 font-medium tracking-tight text-[#0F3D2E]"
+                  style={{
+                    fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif',
+                    fontSize: 'clamp(1.1rem, 2vw, 1.35rem)',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  Coverage that works for you
+                </h2>
+                <p className="mb-5 max-w-md font-sans text-[0.9375rem] leading-[1.6] text-[#3d4a41]">
+                  Download the Centuries Mutual app for exclusive health insurance —
+                  plans, member rewards, and care access in one place.
+                </p>
+                <div className="flex flex-nowrap items-center gap-2">
+                  <Link
+                    href="/downloads"
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0F3D2E] px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] no-underline"
+                  >
+                    Download App
+                  </Link>
+                  <Link
+                    href="/individual-family-services"
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[#0F3D2E] bg-transparent px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] no-underline"
+                  >
+                    Learn More
+                  </Link>
                 </div>
               </div>
             </div>
           </motion.div>
         </div>
       </div>
-
-      <CommunitySearchModal open={searchOpen} onOpenChange={setSearchOpen} />
     </section>
   )
 }
