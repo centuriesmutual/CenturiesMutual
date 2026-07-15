@@ -107,9 +107,19 @@ export function CommunityHero() {
                 >
                   Your Community Brokerage
                 </h1>
+                <h2
+                  className="mb-3 font-medium tracking-tight text-[#0F3D2E]"
+                  style={{
+                    fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif',
+                    fontSize: 'clamp(1.05rem, 3.4vw, 1.35rem)',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  The Common Wealth
+                </h2>
                 <p className="mb-2 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#3d4a41] sm:text-[0.9375rem]">
-                  Community health coverage with member rewards and care access —
-                  all in one membership.
+                  Community health coverage and care access — all in one
+                  membership.
                 </p>
                 <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:flex-nowrap">
                   <Link
