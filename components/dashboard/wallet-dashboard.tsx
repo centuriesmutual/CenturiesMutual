@@ -33,6 +33,7 @@ import {
   type MemberProfile,
   type MemberSession,
 } from '@/lib/member-profile'
+import { createClient } from '@/lib/supabase/client'
 import { loadLedger, appendLedgerEntry, type LedgerEntry } from '@/lib/wallet-ledger'
 import { saveLinkedAccount } from '@/lib/payout-links'
 import {
@@ -142,10 +143,17 @@ export default function WalletDashboard() {
     saveProfile(next)
   }, [])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     markSessionEnding()
     endWalletSession()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {
+      // Still leave Wallet even if Supabase env is missing locally.
+    }
     router.replace('/login')
+    router.refresh()
   }
 
   const completeEnrollment = (plan: EnrolledPlan) => {
@@ -552,6 +560,12 @@ export default function WalletDashboard() {
                           {label}
                         </button>
                       ))}
+                      <Link
+                        href="/insurance-application"
+                        className="rounded-[10px] border border-[#14432A]/15 bg-[#FAFCFB] px-4 py-3 text-left font-sans text-[0.875rem] font-semibold text-[#14432A] no-underline transition hover:border-[#14432A]/30 hover:bg-white sm:col-span-2"
+                      >
+                        Insurance application
+                      </Link>
                     </div>
                   </div>
                   <div className="rounded-2xl bg-[#14432A]/[0.06] p-6">

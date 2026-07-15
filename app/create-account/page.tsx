@@ -5,7 +5,8 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { motion } from 'framer-motion'
 import { SiteHeader } from '@/components/layout/site-header'
 import { UnifiedBenefitCard } from '@/components/ui/figma-feature-cards'
-import { establishSession, saveProfile, DEFAULT_PROFILE } from '@/lib/member-profile'
+import { saveProfile, DEFAULT_PROFILE } from '@/lib/member-profile'
+import { signUpAction } from '@/lib/supabase/auth-actions'
 import { slideInLeft, slideInRight, sectionAnimation } from '@/utils/home-animations'
 
 interface SignupFormData {
@@ -19,7 +20,7 @@ interface SignupFormData {
 }
 
 const NAME_MAX = 40
-const PASSWORD_MIN = 6
+const PASSWORD_MIN = 8
 
 const fieldClass =
   'w-full rounded-[10px] border border-[#E8EBEA] bg-[#FAFCFB] px-3.5 py-2.5 font-sans text-[0.9375rem] text-[#14432A] outline-none transition placeholder:text-[#55655D]/60 focus:border-[#14432A]'
@@ -80,7 +81,7 @@ export default function CreateAccountPage() {
     if (error) setError(null)
   }
 
-  const handleSignup = (e: FormEvent<HTMLFormElement>) => {
+  const handleSignup = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
@@ -132,10 +133,30 @@ export default function CreateAccountPage() {
       return
     }
 
-    setIsSubmitting(false)
-    establishSession(email)
-    saveProfile(DEFAULT_PROFILE)
-    setSuccess(true)
+    try {
+      const result = await signUpAction({
+        firstName,
+        lastName,
+        email,
+        phone: phoneDigits,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        agreeToTerms: true as const,
+      })
+
+      if (result.ok === false) {
+        setError(result.error)
+        setIsSubmitting(false)
+        return
+      }
+
+      saveProfile(DEFAULT_PROFILE)
+      setSuccess(true)
+    } catch {
+      setError('An error occurred during signup. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -159,17 +180,17 @@ export default function CreateAccountPage() {
                     fontSize: 'clamp(1.75rem, 3.5vw, 2.35rem)',
                   }}
                 >
-                  Account created
+                  Verify your email
                 </h1>
                 <p className="mx-auto mb-8 max-w-md font-sans text-[0.9375rem] leading-[1.65] text-[#55655D]">
-                  Your Centuries Mutual membership is ready. Open your Wallet to
-                  explore coverage, claim Wintergarden tokens, and manage rewards.
+                  We sent a verification link to your inbox. Confirm your email,
+                  then sign in to open your Wallet and continue enrollment.
                 </p>
                 <Link
-                  href="/wallet"
+                  href="/login"
                   className="inline-flex items-center justify-center rounded-[10px] bg-[#0F3D2E] px-5 py-2 font-sans text-[0.875rem] font-semibold text-[#FAFCFB] no-underline transition hover:bg-[#0A2E22]"
                 >
-                  Open Wallet
+                  Go to Login
                 </Link>
               </motion.div>
             ) : (
