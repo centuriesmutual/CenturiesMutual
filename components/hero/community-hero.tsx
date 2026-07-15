@@ -117,9 +117,9 @@ export function CommunityHero() {
                 >
                   The Common Wealth
                 </h2>
-                <p className="mb-2 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#3d4a41] sm:text-[0.9375rem]">
-                  Community health coverage and care access — all in one
-                  membership.
+                <p className="mb-3 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#3d4a41] sm:text-[0.9375rem]">
+                  A member network with healthcare rewards designed for lasting
+                  value.
                 </p>
                 <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:flex-nowrap">
                   <Link
