@@ -136,10 +136,10 @@ function Scene() {
 export function PayFlow3D({ className }: { className?: string }) {
   return (
     <div
-      className={`h-full w-full bg-transparent ${className ?? ''}`}
+      className={className}
       style={{
         width: '100%',
-        height: '100%',
+        height: 'min(380px, 72vw)',
         minHeight: 240,
         background: 'transparent',
       }}
