@@ -86,7 +86,12 @@ function FooterLinkItem({ href, label, external }: FooterLink) {
   )
 }
 
-export default function Footer() {
+export default function Footer({
+  variant = 'full',
+}: {
+  /** `legal` keeps only the copyright / legal link bar (sub-footer). */
+  variant?: 'full' | 'legal'
+}) {
   const [mounted, setMounted] = useState(false)
   const [windowWidth, setWindowWidth] = useState(0)
 
@@ -112,6 +117,39 @@ export default function Footer() {
 
   const { width, height, fontSize } = getLogoSize()
   const year = mounted ? new Date().getFullYear() : 2026
+
+  const legalBar = (
+    <div className="border-t border-white/10">
+      <div className="container py-4">
+        <div className="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+          <p className="mb-0 text-white/55" style={{ fontSize: '0.8125rem' }}>
+            © {year} Centuries Mutual. All rights reserved.
+          </p>
+          <ul className="list-unstyled d-flex flex-wrap gap-x-3 gap-y-2 mb-0">
+            {LEGAL_LINKS.map((link) => (
+              <li key={link.label}>
+                <Link
+                  href={link.href}
+                  className="font-sans text-[0.75rem] uppercase tracking-[0.12em] text-white/55 text-decoration-none hover:text-white"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="mt-3 mb-0 text-white/35" style={{ fontSize: '0.7rem', lineHeight: 1.55, maxWidth: 920 }}>
+          © Centuries Mutual. All product names, logos, and brands are property of
+          their respective owners. Coverage and rewards are subject to plan documents
+          and applicable law.
+        </p>
+      </div>
+    </div>
+  )
+
+  if (variant === 'legal') {
+    return <footer className="bg-[#0B1F17] text-white">{legalBar}</footer>
+  }
 
   return (
     <footer className="bg-[#0B1F17] text-white">
@@ -259,33 +297,7 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Legal / copyright bar */}
-      <div className="border-t border-white/10">
-        <div className="container py-4">
-          <div className="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
-            <p className="mb-0 text-white/55" style={{ fontSize: '0.8125rem' }}>
-              © {year} Centuries Mutual. All rights reserved.
-            </p>
-            <ul className="list-unstyled d-flex flex-wrap gap-x-3 gap-y-2 mb-0">
-              {LEGAL_LINKS.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    href={link.href}
-                    className="font-sans text-[0.75rem] uppercase tracking-[0.12em] text-white/55 text-decoration-none hover:text-white"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="mt-3 mb-0 text-white/35" style={{ fontSize: '0.7rem', lineHeight: 1.55, maxWidth: 920 }}>
-            © Centuries Mutual. All product names, logos, and brands are property of
-            their respective owners. Coverage and rewards are subject to plan documents
-            and applicable law.
-          </p>
-        </div>
-      </div>
+      {legalBar}
     </footer>
   )
 }

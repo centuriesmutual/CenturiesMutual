@@ -128,7 +128,7 @@ function Scene() {
       <directionalLight position={[-4, 3, 2]} intensity={0.35} color={GOLD} />
       <GroceryStore />
       <ContactShadows position={[0, -1.7, 0]} opacity={0.25} scale={12} blur={2.6} far={5} />
-      <Environment preset="apartment" />
+      <Environment preset="apartment" background={false} environmentIntensity={0.35} />
     </>
   )
 }
@@ -136,17 +136,17 @@ function Scene() {
 export function PayFlow3D({ className }: { className?: string }) {
   return (
     <div
-      className={className}
+      className={`h-full w-full bg-transparent ${className ?? ''}`}
       style={{
         width: '100%',
-        height: 'min(380px, 72vw)',
+        height: '100%',
         minHeight: 240,
         background: 'transparent',
       }}
     >
       <Suspense
         fallback={
-          <div className="flex h-full items-center justify-center bg-transparent font-sans text-sm text-[#55655D]">
+          <div className="flex h-full items-center justify-center bg-transparent font-sans text-sm text-[#8FB39E]">
             Loading…
           </div>
         }
@@ -154,8 +154,12 @@ export function PayFlow3D({ className }: { className?: string }) {
         <Canvas
           camera={{ position: [0, 0.6, 7.2], fov: 34 }}
           dpr={[1, 1.75]}
-          gl={{ antialias: true, alpha: true }}
-          style={{ background: 'transparent' }}
+          gl={{ antialias: true, alpha: true, premultipliedAlpha: false }}
+          style={{ background: 'transparent', width: '100%', height: '100%' }}
+          onCreated={({ gl, scene }) => {
+            gl.setClearColor(0x000000, 0)
+            scene.background = null
+          }}
         >
           <Scene />
         </Canvas>
