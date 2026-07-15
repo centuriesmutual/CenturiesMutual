@@ -17,26 +17,33 @@ type Partner = {
   blurb: string
   logo: string
   href?: string
+  /** Prefer contain for wide wordmarks so letters are not cropped. */
+  logoFit?: 'cover' | 'contain'
+  logoWellClassName?: string
 }
 
 const PARTNERS: ReadonlyArray<Partner> = [
   {
     name: 'Intuit',
-    category: 'Business Data',
-    blurb: 'Business data that keeps member accounts and ledgers in sync.',
+    category: 'Tax Services',
+    blurb: 'Tax preparation and filing tools that help members file with confidence.',
     logo: '/partners/intuit.svg',
   },
   {
-    name: 'HealthEquity',
-    category: 'Health Money Wallet',
-    blurb: 'Health money wallet for HSAs and member balances that earn.',
-    logo: '/partners/healthequity.svg',
+    name: 'Paymentus',
+    category: 'Bill Pay',
+    blurb: 'Bill pay rails for utilities, rent, and member payments in one flow.',
+    logo: '/partners/paymentus.png',
+    logoFit: 'contain',
+    logoWellClassName: 'bg-[#134B74] ring-[#134B74]',
   },
   {
-    name: 'WEX',
-    category: 'Payment Rails',
-    blurb: 'Payment rails behind wallets, rent, bills, and benefits spend.',
-    logo: '/partners/wex.svg',
+    name: 'IBM',
+    category: 'Enterprise Technology',
+    blurb: 'Enterprise systems and cloud infrastructure that power secure member platforms.',
+    logo: '/partners/ibm.png',
+    logoFit: 'contain',
+    logoWellClassName: 'bg-black ring-[#14432A]/20',
   },
   {
     name: 'CVS',
@@ -184,17 +191,24 @@ export default function HealthInsuranceLegacy() {
             viewport={{ once: true, margin: '-80px' }}
             transition={{ duration: 1.05, ease: [0.22, 1, 0.36, 1] }}
           >
-            {PARTNERS.map(({ name, category, blurb, logo, href }) => {
+            {PARTNERS.map(({ name, category, blurb, logo, href, logoFit, logoWellClassName }) => {
+              const fit = logoFit ?? 'cover'
               const inner = (
                 <>
                   <div className="mb-3 flex items-center gap-3">
-                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px] bg-white shadow-[0_1px_2px_rgba(15,61,46,0.08)] ring-1 ring-[#14432A]/10">
+                    <div
+                      className={`relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px] shadow-[0_1px_2px_rgba(15,61,46,0.08)] ring-1 ring-[#14432A]/10 ${
+                        logoWellClassName ?? 'bg-white'
+                      }`}
+                    >
                       <Image
                         src={logo}
                         alt={`${name} logo`}
                         width={44}
                         height={44}
-                        className="h-full w-full object-cover"
+                        className={`h-full w-full ${
+                          fit === 'contain' ? 'object-contain p-[5px]' : 'object-cover'
+                        }`}
                         unoptimized
                       />
                     </div>
