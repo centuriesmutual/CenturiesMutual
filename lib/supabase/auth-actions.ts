@@ -2,7 +2,6 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/admin'
 import {
   loginSchema,
   resetPasswordRequestSchema,
@@ -23,64 +22,28 @@ export type AuthActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string[] | undefined> }
 
-function isEmailDeliveryFailure(error: {
+function readableAuthError(error: {
   message?: string
   status?: number
   code?: string
-} | null) {
-  if (!error) return false
-  const msg = (error.message || '').toLowerCase()
-  return (
-    msg.includes('confirmation email') ||
-    msg.includes('error sending') ||
-    msg.includes('sending confirmation') ||
+} | null): string {
+  if (!error) return 'Could not create your account. Please try again.'
+
+  const msg = (error.message || '').trim()
+  const lower = msg.toLowerCase()
+
+  if (
+    lower.includes('confirmation email') ||
+    lower.includes('error sending') ||
+    lower.includes('sending confirmation') ||
     msg === '{}' ||
     error.status === 500
-  )
-}
-
-async function createMemberViaServiceRole(input: {
-  email: string
-  password: string
-  firstName: string
-  lastName: string
-  phone: string
-}): Promise<AuthActionResult> {
-  const admin = createServiceClient()
-  const { data, error } = await admin.auth.admin.createUser({
-    email: input.email,
-    password: input.password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: input.firstName,
-      last_name: input.lastName,
-      phone: input.phone,
-    },
-  })
-
-  if (error) {
-    const msg = (error.message || '').toLowerCase()
-    if (msg.includes('already') || msg.includes('registered')) {
-      return {
-        ok: false,
-        error: 'An account with this email already exists. Please log in instead.',
-      }
-    }
-    return {
-      ok: false,
-      error: error.message || 'Could not create your account. Please try again.',
-    }
+  ) {
+    return 'We could not send your verification email. Please try again in a few minutes. If this continues, contact support — email delivery must be working before you can verify and sign in.'
   }
 
-  if (!data.user) {
-    return { ok: false, error: 'Could not create your account. Please try again.' }
-  }
-
-  return {
-    ok: true,
-    message:
-      'Account created. You can sign in with your email and password.',
-  }
+  if (msg && msg !== '{}') return msg
+  return 'Could not create your account. Please try again.'
 }
 
 export async function signUpAction(input: unknown): Promise<AuthActionResult> {
@@ -118,24 +81,7 @@ export async function signUpAction(input: unknown): Promise<AuthActionResult> {
     })
 
     if (error) {
-      // Supabase project currently fails sending confirmation mail (returns
-      // "{}" / 500). Fall back to service-role create with confirmed email so
-      // membership signup still works while SMTP is unavailable.
-      if (isEmailDeliveryFailure(error)) {
-        return createMemberViaServiceRole({
-          email: data.email,
-          password: data.password,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-        })
-      }
-
-      const message =
-        error.message && error.message !== '{}'
-          ? error.message
-          : 'Could not create your account. Please try again.'
-      return { ok: false, error: message }
+      return { ok: false, error: readableAuthError(error) }
     }
 
     // Supabase may return a user with empty identities when the email is already registered.
@@ -150,36 +96,40 @@ export async function signUpAction(input: unknown): Promise<AuthActionResult> {
       }
     }
 
-    return {
-      ok: true,
-      message:
-        'Account created. Check your email to verify your address before signing in.',
-    }
-  } catch (err) {
-    const message =
-      err instanceof Error && err.message && err.message !== '{}'
-        ? err.message
-        : 'Could not create your account. Please try again.'
-
-    // Last-resort path when the client throws AuthRetryableFetchError("{}")
-    if (message === '{}' || /retryable|fetch/i.test(String(err))) {
-      try {
-        const parsed = signupSchema.safeParse(input)
-        if (parsed.success) {
-          return createMemberViaServiceRole({
-            email: parsed.data.email,
-            password: parsed.data.password,
-            firstName: parsed.data.firstName,
-            lastName: parsed.data.lastName,
-            phone: parsed.data.phone,
-          })
-        }
-      } catch {
-        /* fall through */
+    // Require email confirmation — never treat an unconfirmed user as fully registered.
+    if (signUpData.user && !signUpData.user.email_confirmed_at) {
+      return {
+        ok: true,
+        message:
+          'Account created. Check your email for a verification link before signing in.',
       }
     }
 
-    return { ok: false, error: message === '{}' ? 'Could not create your account. Please try again.' : message }
+    if (signUpData.user?.email_confirmed_at) {
+      // Project has confirm-email disabled; still nudge login rather than auto-wallet.
+      return {
+        ok: true,
+        message:
+          'Account created. You can sign in with your email and password.',
+      }
+    }
+
+    return {
+      ok: true,
+      message:
+        'Account created. Check your email for a verification link before signing in.',
+    }
+  } catch (err) {
+    if (err && typeof err === 'object' && 'message' in err) {
+      return {
+        ok: false,
+        error: readableAuthError(err as { message?: string; status?: number }),
+      }
+    }
+    return {
+      ok: false,
+      error: 'Could not create your account. Please try again.',
+    }
   }
 }
 

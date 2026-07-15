@@ -13,7 +13,9 @@ Project: `fvgollhjkvkxmibqksgv` (`https://fvgollhjkvkxmibqksgv.supabase.co`)
 
 Configured for production Site URL `https://www.centuriesmutual.com` with redirect allowlist covering production, apex domain, Vercel preview host, and `localhost:3030`.
 
-Email provider is enabled with confirm-email required before sign-in.
+Email provider is enabled with **confirm-email required** before sign-in
+(`mailer_autoconfirm=false`). Confirmation emails fail until SMTP works
+(Supabase default mailer or custom SMTP under Auth → SMTP Settings).
 
 ## Vercel environment variables
 

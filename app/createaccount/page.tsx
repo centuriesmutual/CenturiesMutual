@@ -195,7 +195,7 @@ export default function CreateAccountPage() {
                     fontSize: 'clamp(1.75rem, 3.5vw, 2.35rem)',
                   }}
                 >
-                  Account created
+                  Verify your email
                 </h1>
                 <p className="mx-auto mb-8 max-w-md font-sans text-[0.9375rem] leading-[1.65] text-[#55655D]">
                   {successMessage}
