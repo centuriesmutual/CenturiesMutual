@@ -4,12 +4,10 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { useUser } from '@auth0/nextjs-auth0/client'
 
 export default function Navbar() {
   const [mounted, setMounted] = useState<boolean>(false)
   const [windowWidth, setWindowWidth] = useState<number>(0)
-  const { user, isLoading } = useUser()
   const pathname = usePathname()
   const isLoginPage = pathname === '/login'
   const isSignupPage = pathname === '/signup'
@@ -127,59 +125,29 @@ export default function Navbar() {
                   Home
                 </Link>
               )}
-              {!isLoading && (
-                <>
-                  {user ? (
-                    <>
-                      <span
-                        className="nav-link text-muted"
-                        style={{ fontSize: '0.9rem' }}
-                      >
-                        {user.email}
-                      </span>
-                      <a
-                        href="/api/auth/logout"
-                        className="btn btn-outline-primary px-2 px-lg-4 py-1 py-lg-2 mobile-login"
-                        style={{
-                          borderColor: '#14432A',
-                          color: '#14432A',
-                          fontSize: '1rem',
-                          whiteSpace: 'nowrap',
-                          minWidth: '120px',
-                          padding: '0.5rem 1rem',
-                          flexShrink: 0,
-                        }}
-                      >
-                        Logout
-                      </a>
-                    </>
-                  ) : (
-                    !isLoginPage &&
-                    !isSignupPage &&
-                    !isRentalEquityPage &&
-                    !isInvestorRelationsPage &&
-                    !isCareersPage &&
-                    !isChildCarePage &&
-                    !isTrustScorePage && (
-                      <Link
-                        href="/login"
-                        className="btn btn-primary px-2 px-lg-4 py-1 py-lg-2 mobile-login"
-                        style={{
-                          backgroundColor: '#14432A',
-                          borderColor: '#14432A',
-                          fontSize: '1rem',
-                          whiteSpace: 'nowrap',
-                          minWidth: '120px',
-                          padding: '0.5rem 1rem',
-                          flexShrink: 0,
-                        }}
-                      >
-                        Client Login
-                      </Link>
-                    )
-                  )}
-                </>
-              )}
+              {!isLoginPage &&
+                !isSignupPage &&
+                !isRentalEquityPage &&
+                !isInvestorRelationsPage &&
+                !isCareersPage &&
+                !isChildCarePage &&
+                !isTrustScorePage && (
+                  <Link
+                    href="/login"
+                    className="btn btn-primary px-2 px-lg-4 py-1 py-lg-2 mobile-login"
+                    style={{
+                      backgroundColor: '#14432A',
+                      borderColor: '#14432A',
+                      fontSize: '1rem',
+                      whiteSpace: 'nowrap',
+                      minWidth: '120px',
+                      padding: '0.5rem 1rem',
+                      flexShrink: 0,
+                    }}
+                  >
+                    Client Login
+                  </Link>
+                )}
             </div>
           </div>
         </div>

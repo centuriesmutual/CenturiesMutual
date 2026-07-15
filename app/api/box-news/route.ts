@@ -1,5 +1,8 @@
 import BoxSDK from 'box-node-sdk'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Box.com API Integration for Newspaper Articles
  *

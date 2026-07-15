@@ -57,15 +57,10 @@ export default function Signup() {
     }
 
     try {
-      // Hand off to Auth0 Universal Login with the signup screen hint.
-      // Account creation happens on the Auth0 hosted page.
+      // Email/password membership signup lives on Create Account → Wallet.
       const params = new URLSearchParams()
-      params.set('screen_hint', 'signup')
-      params.set('returnTo', 'https://block.centuriesmutual.com')
-      if (formData.email) {
-        params.set('login_hint', formData.email)
-      }
-      window.location.href = `/api/auth/login?${params.toString()}`
+      if (formData.email) params.set('email', formData.email)
+      window.location.href = `/create-account${params.toString() ? `?${params}` : ''}`
     } catch {
       setError('An error occurred during signup. Please try again.')
       setIsSubmitting(false)

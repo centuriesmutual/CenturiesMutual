@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import fs from 'fs'
 import PDFDocument from 'pdfkit'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Box.com API Integration for Health Insurance Enrollment
  *

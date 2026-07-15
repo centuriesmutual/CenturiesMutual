@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fetchHomeFeed } from '@/lib/youtube/server'
 import type { WatchEvent } from '@/lib/youtube/types'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(req: NextRequest) {
   const category = req.nextUrl.searchParams.get('category') ?? 'All'
   let history: WatchEvent[] = []

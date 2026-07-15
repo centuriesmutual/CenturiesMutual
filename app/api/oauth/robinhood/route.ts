@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 function baseUrl(req: NextRequest) {
   const env = process.env.NEXT_PUBLIC_APP_URL
   if (env) return env.replace(/\/$/, '')
