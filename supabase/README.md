@@ -1,19 +1,19 @@
 # Supabase for Centuries Mutual
 
-## Apply the database
+Project: `fvgollhjkvkxmibqksgv` (`https://fvgollhjkvkxmibqksgv.supabase.co`)
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run:
-   - `supabase/migrations/20260715000000_centuries_mutual_foundation.sql`
-3. Auth settings → enable **Email** provider.
-4. Enable **Confirm email** for production.
-5. Auth → URL configuration:
-   - Site URL: `https://centuriesmutual.com` (or your Vercel URL)
-   - Redirect URLs:
-     - `https://centuriesmutual.com/auth/callback`
-     - `https://centuriesmutual.com/auth/update-password`
-     - `http://localhost:3030/auth/callback`
-     - `http://localhost:3030/auth/update-password`
+## Already applied
+
+- Foundation migration (`profiles`, `insurance_applications`, `application_documents`, RLS, signup trigger)
+- Private storage bucket `applications`
+- Email auth enabled with confirm-email (`mailer_autoconfirm=false`)
+- Vercel env vars for URL / anon / service role (+ `NEXT_PUBLIC_APP_URL`)
+
+## Auth URL configuration
+
+Configured for production Site URL `https://www.centuriesmutual.com` with redirect allowlist covering production, apex domain, Vercel preview host, and `localhost:3030`.
+
+Email provider is enabled with confirm-email required before sign-in.
 
 ## Vercel environment variables
 

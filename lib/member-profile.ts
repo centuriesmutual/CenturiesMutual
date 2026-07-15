@@ -20,7 +20,7 @@ export type MemberProfile = {
 export const SESSION_KEY = 'cm_member_session'
 export const PROFILE_KEY = 'cm_member_profile'
 export const ADMIN_PROFILES_KEY = 'cm_admin_enrollments'
-/** Present only after login / create-account; required to open Wallet. */
+/** Present only after login / createaccount; required to open Wallet. */
 export const WALLET_ENTRY_KEY = 'cm_wallet_entry'
 /** Set after a successful Wallet boot — allows refresh while staying in Wallet. */
 export const WALLET_ACTIVE_KEY = 'cm_wallet_active'
@@ -69,8 +69,15 @@ export function saveSession(session: MemberSession) {
   window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
 }
 
-/** Establish a Wallet session after login or account creation. */
-export function establishSession(username: string): MemberSession {
+/**
+ * Bind a Wallet UX session after a verified Supabase sign-in.
+ * Call only with the authenticated member email — never invent placeholders.
+ */
+export function establishSession(email: string): MemberSession {
+  const username = email.trim().toLowerCase()
+  if (!username || !username.includes('@')) {
+    throw new Error('Authenticated email is required to open Wallet.')
+  }
   const now = new Date().toISOString()
   const session: MemberSession = {
     username,

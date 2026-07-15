@@ -26,6 +26,7 @@ import {
 import {
   DEFAULT_PROFILE,
   endWalletSession,
+  establishSession,
   loadProfile,
   markSessionEnding,
   saveProfile,
@@ -90,35 +91,90 @@ export default function WalletDashboard() {
   useWalletSessionGuard(ready)
 
   useEffect(() => {
-    const access = validateWalletAccess()
-    if (!access.ok) {
-      router.replace('/login')
-      return
-    }
-    setSession(access.session)
-    setProfile(loadProfile())
-    setLedger(loadLedger())
-    setReady(true)
-    finishWalletOauthRedirect()
+    let cancelled = false
 
-    const params = new URLSearchParams(window.location.search)
-    const oauth = params.get('oauth')
-    const status = params.get('status')
-    if (oauth === 'coinbase' || oauth === 'robinhood') {
-      if (status === 'linked') {
-        saveLinkedAccount({
-          provider: oauth,
-          linkedAt: new Date().toISOString(),
-          displayName: oauth === 'coinbase' ? 'Coinbase' : 'Robinhood',
-          accountRef: oauth,
-        })
-        setOauthNotice(`${oauth === 'coinbase' ? 'Coinbase' : 'Robinhood'} connected.`)
-        setTab('cashout')
-      } else if (status === 'error') {
-        setOauthNotice('OAuth connection failed. Try again.')
-        setTab('cashout')
+    const boot = async () => {
+      try {
+        const supabase = createClient()
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser()
+
+        if (cancelled) return
+
+        if (error || !user?.email || !user.email_confirmed_at) {
+          endWalletSession()
+          try {
+            await supabase.auth.signOut()
+          } catch {
+            /* ignore */
+          }
+          router.replace('/login')
+          return
+        }
+
+        const access = validateWalletAccess()
+        if (!access.ok) {
+          // Fresh verified Supabase session (e.g. email confirm → callback) can
+          // mint the Wallet entry grant; bare sessionStorage alone cannot.
+          establishSession(user.email)
+        }
+
+        const granted = validateWalletAccess()
+        if (!granted.ok) {
+          endWalletSession()
+          await supabase.auth.signOut()
+          router.replace('/login')
+          return
+        }
+
+        // Reject local session bound to a different identity.
+        if (granted.session.username.toLowerCase() !== user.email.toLowerCase()) {
+          endWalletSession()
+          await supabase.auth.signOut()
+          router.replace('/login')
+          return
+        }
+
+        setSession(granted.session)
+        setProfile(loadProfile())
+        setLedger(loadLedger())
+        setReady(true)
+        finishWalletOauthRedirect()
+
+        const params = new URLSearchParams(window.location.search)
+        const oauth = params.get('oauth')
+        const status = params.get('status')
+        if (oauth === 'coinbase' || oauth === 'robinhood') {
+          if (status === 'linked') {
+            saveLinkedAccount({
+              provider: oauth,
+              linkedAt: new Date().toISOString(),
+              displayName: oauth === 'coinbase' ? 'Coinbase' : 'Robinhood',
+              accountRef: oauth,
+            })
+            setOauthNotice(
+              `${oauth === 'coinbase' ? 'Coinbase' : 'Robinhood'} connected.`,
+            )
+            setTab('cashout')
+          } else if (status === 'error') {
+            setOauthNotice('OAuth connection failed. Try again.')
+            setTab('cashout')
+          }
+          window.history.replaceState({}, '', '/wallet')
+        }
+      } catch {
+        if (!cancelled) {
+          endWalletSession()
+          router.replace('/login')
+        }
       }
-      window.history.replaceState({}, '', '/wallet')
+    }
+
+    void boot()
+    return () => {
+      cancelled = true
     }
   }, [router])
 

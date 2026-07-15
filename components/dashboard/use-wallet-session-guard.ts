@@ -15,6 +15,16 @@ import {
   touchSession,
   validateWalletAccess,
 } from '@/lib/member-profile'
+import { createClient } from '@/lib/supabase/client'
+
+async function signOutSupabase() {
+  try {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+  } catch {
+    // Local teardown still proceeds.
+  }
+}
 
 const LEAVE_MESSAGE =
   'Leaving Wallet will end your secure session. You will need to sign in again.'
@@ -62,7 +72,9 @@ export function useWalletSessionGuard(enabled: boolean) {
       endingRef.current = true
       markSessionEnding()
       endWalletSession()
-      router.replace(to)
+      void signOutSupabase().finally(() => {
+        router.replace(to)
+      })
     }
 
     const confirmLeave = () => window.confirm(LEAVE_MESSAGE)
@@ -73,15 +85,17 @@ export function useWalletSessionGuard(enabled: boolean) {
       endingRef.current = true
       markSessionEnding()
       endWalletSession()
-      if (destination) {
-        if (isExternalHref(destination)) {
-          window.location.href = destination
+      void signOutSupabase().finally(() => {
+        if (destination) {
+          if (isExternalHref(destination)) {
+            window.location.href = destination
+          } else {
+            router.push(destination)
+          }
         } else {
-          router.push(destination)
+          router.replace('/login')
         }
-      } else {
-        router.replace('/login')
-      }
+      })
     }
 
     // Activity keeps the idle clock fresh.
@@ -151,7 +165,9 @@ export function useWalletSessionGuard(enabled: boolean) {
       endingRef.current = true
       markSessionEnding()
       endWalletSession()
-      router.replace('/login')
+      void signOutSupabase().finally(() => {
+        router.replace('/login')
+      })
     }
 
     window.addEventListener('beforeunload', onBeforeUnload)

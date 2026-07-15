@@ -6,6 +6,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { clearSession, establishSession } from '@/lib/member-profile'
 import { signInAction } from '@/lib/supabase/auth-actions'
+import { createClient } from '@/lib/supabase/client'
 
 interface LoginFormData {
   email: string
@@ -27,8 +28,11 @@ export default function LoginClient() {
 
   useEffect(() => {
     clearSession()
-    if (searchParams.get('error') === 'auth_callback') {
+    const err = searchParams.get('error')
+    if (err === 'auth_callback') {
       setError('Email verification link was invalid or expired. Please try again.')
+    } else if (err === 'auth_unavailable') {
+      setError('Authentication is temporarily unavailable. Please try again shortly.')
     }
   }, [searchParams])
 
@@ -49,18 +53,42 @@ export default function LoginClient() {
     setIsSubmitting(true)
     setError(null)
 
+    const email = formData.email.trim().toLowerCase()
+    const password = formData.password
+
+    if (!email || !email.includes('@') || !password) {
+      setError('Enter a valid email and password.')
+      setIsSubmitting(false)
+      return
+    }
+
     try {
-      const result = await signInAction({
-        email: formData.email.trim(),
-        password: formData.password,
-      })
+      const result = await signInAction({ email, password })
       if (result.ok === false) {
         setError(result.error)
         setIsSubmitting(false)
         return
       }
 
-      establishSession(formData.email.trim() || 'member')
+      const supabase = createClient()
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !user?.email || !user.email_confirmed_at) {
+        await supabase.auth.signOut()
+        clearSession()
+        setError(
+          user?.email && !user.email_confirmed_at
+            ? 'Please verify your email before signing in.'
+            : 'Authentication failed. Please try again.',
+        )
+        setIsSubmitting(false)
+        return
+      }
+
+      establishSession(user.email)
       const next = searchParams.get('next')
       router.replace(next && next.startsWith('/') ? next : '/wallet')
       router.refresh()
@@ -125,18 +153,18 @@ export default function LoginClient() {
                 <form onSubmit={handleLogin}>
                   <div className="mb-3">
                     <label htmlFor="email" className="form-label small text-muted">
-                      Username or Email
+                      Email
                     </label>
                     <input
-                      type="text"
+                      type="email"
                       className="form-control"
                       id="email"
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      placeholder="Enter username or email"
+                      placeholder="Enter your email"
                       required
-                      autoComplete="username"
+                      autoComplete="email"
                       style={{
                         borderColor: '#e9ecef',
                         fontSize: '1rem',
@@ -232,7 +260,7 @@ export default function LoginClient() {
                   <p className="text-muted small mb-3">
                     Don&apos;t have an account?{' '}
                     <Link
-                      href="/signup"
+                      href="/createaccount"
                       className="text-decoration-none"
                       style={{ color: '#14432A', fontWeight: '500' }}
                     >

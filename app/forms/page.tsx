@@ -14,7 +14,7 @@ export default function FormsPage() {
       title="Forms"
       lead="The Centuries Mutual Forms center is where membership paperwork lives — enrollment applications, claims submissions, authorizations, beneficiary updates, and plan change requests — organized so you always know what to file, what is pending, and what has been completed."
       ctaLabel="Create Account"
-      ctaHref="/create-account"
+      ctaHref="/createaccount"
       secondaryLabel="Member login"
       secondaryHref="/login"
       sections={[

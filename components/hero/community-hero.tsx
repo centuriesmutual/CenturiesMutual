@@ -129,7 +129,7 @@ export function CommunityHero() {
                     Download App
                   </Link>
                   <Link
-                    href="/create-account"
+                    href="/createaccount"
                     className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[#0F3D2E] bg-transparent px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] no-underline"
                   >
                     Create Account

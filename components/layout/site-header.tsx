@@ -40,6 +40,7 @@ export function SiteHeader() {
       !pathname ||
       pathname.startsWith('/wallet') ||
       pathname === '/login' ||
+      pathname.startsWith('/createaccount') ||
       pathname.startsWith('/create-account')
     ) {
       return

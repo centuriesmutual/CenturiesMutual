@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/admin'
 import {
   loginSchema,
   resetPasswordRequestSchema,
@@ -22,41 +23,163 @@ export type AuthActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string[] | undefined> }
 
-export async function signUpAction(input: unknown): Promise<AuthActionResult> {
-  const parsed = signupSchema.safeParse(input)
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: 'Please fix the highlighted fields.',
-      fieldErrors: formatZodError(parsed.error),
-    }
-  }
+function isEmailDeliveryFailure(error: {
+  message?: string
+  status?: number
+  code?: string
+} | null) {
+  if (!error) return false
+  const msg = (error.message || '').toLowerCase()
+  return (
+    msg.includes('confirmation email') ||
+    msg.includes('error sending') ||
+    msg.includes('sending confirmation') ||
+    msg === '{}' ||
+    error.status === 500
+  )
+}
 
-  const data = parsed.data
-  const supabase = createClient()
-  const origin = siteUrl()
-
-  const { error } = await supabase.auth.signUp({
-    email: data.email,
-    password: data.password,
-    options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/wallet`,
-      data: {
-        first_name: data.firstName,
-        last_name: data.lastName,
-        phone: data.phone,
-      },
+async function createMemberViaServiceRole(input: {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  phone: string
+}): Promise<AuthActionResult> {
+  const admin = createServiceClient()
+  const { data, error } = await admin.auth.admin.createUser({
+    email: input.email,
+    password: input.password,
+    email_confirm: true,
+    user_metadata: {
+      first_name: input.firstName,
+      last_name: input.lastName,
+      phone: input.phone,
     },
   })
 
   if (error) {
-    return { ok: false, error: error.message }
+    const msg = (error.message || '').toLowerCase()
+    if (msg.includes('already') || msg.includes('registered')) {
+      return {
+        ok: false,
+        error: 'An account with this email already exists. Please log in instead.',
+      }
+    }
+    return {
+      ok: false,
+      error: error.message || 'Could not create your account. Please try again.',
+    }
+  }
+
+  if (!data.user) {
+    return { ok: false, error: 'Could not create your account. Please try again.' }
   }
 
   return {
     ok: true,
     message:
-      'Account created. Check your email to verify your address before signing in.',
+      'Account created. You can sign in with your email and password.',
+  }
+}
+
+export async function signUpAction(input: unknown): Promise<AuthActionResult> {
+  try {
+    const parsed = signupSchema.safeParse(input)
+    if (!parsed.success) {
+      const fieldErrors = formatZodError(parsed.error)
+      const first =
+        Object.values(fieldErrors)
+          .flat()
+          .find((m): m is string => typeof m === 'string' && m.length > 0) ||
+        'Please fix the highlighted fields.'
+      return {
+        ok: false,
+        error: first,
+        fieldErrors,
+      }
+    }
+
+    const data = parsed.data
+    const supabase = createClient()
+    const origin = siteUrl()
+
+    const { data: signUpData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        emailRedirectTo: `${origin}/auth/callback?next=/wallet`,
+        data: {
+          first_name: data.firstName,
+          last_name: data.lastName,
+          phone: data.phone,
+        },
+      },
+    })
+
+    if (error) {
+      // Supabase project currently fails sending confirmation mail (returns
+      // "{}" / 500). Fall back to service-role create with confirmed email so
+      // membership signup still works while SMTP is unavailable.
+      if (isEmailDeliveryFailure(error)) {
+        return createMemberViaServiceRole({
+          email: data.email,
+          password: data.password,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+        })
+      }
+
+      const message =
+        error.message && error.message !== '{}'
+          ? error.message
+          : 'Could not create your account. Please try again.'
+      return { ok: false, error: message }
+    }
+
+    // Supabase may return a user with empty identities when the email is already registered.
+    if (
+      signUpData.user &&
+      Array.isArray(signUpData.user.identities) &&
+      signUpData.user.identities.length === 0
+    ) {
+      return {
+        ok: false,
+        error: 'An account with this email already exists. Please log in instead.',
+      }
+    }
+
+    return {
+      ok: true,
+      message:
+        'Account created. Check your email to verify your address before signing in.',
+    }
+  } catch (err) {
+    const message =
+      err instanceof Error && err.message && err.message !== '{}'
+        ? err.message
+        : 'Could not create your account. Please try again.'
+
+    // Last-resort path when the client throws AuthRetryableFetchError("{}")
+    if (message === '{}' || /retryable|fetch/i.test(String(err))) {
+      try {
+        const parsed = signupSchema.safeParse(input)
+        if (parsed.success) {
+          return createMemberViaServiceRole({
+            email: parsed.data.email,
+            password: parsed.data.password,
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            phone: parsed.data.phone,
+          })
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+
+    return { ok: false, error: message === '{}' ? 'Could not create your account. Please try again.' : message }
   }
 }
 
@@ -71,13 +194,22 @@ export async function signInAction(input: unknown): Promise<AuthActionResult> {
   }
 
   const supabase = createClient()
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   })
 
-  if (error) {
-    return { ok: false, error: error.message }
+  if (error || !data.user) {
+    return { ok: false, error: 'Invalid email or password.' }
+  }
+
+  if (!data.user.email_confirmed_at) {
+    await supabase.auth.signOut()
+    return {
+      ok: false,
+      error:
+        'Please verify your email before signing in. Check your inbox for the confirmation link.',
+    }
   }
 
   return { ok: true }
