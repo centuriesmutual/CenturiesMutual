@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { requireUser } from '@/lib/supabase/auth-helpers'
+import { requireAdmin } from '@/lib/admin/access'
 import {
   LedgerBridgeError,
   parseBridgeResponse,
@@ -31,7 +31,7 @@ interface ActivateResult {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireUser()
+  const auth = await requireAdmin()
   if (auth.error) return auth.error
 
   const adminKey = process.env.LEDGER_BRIDGE_ADMIN_KEY?.trim()

@@ -97,6 +97,31 @@ export const insuranceApplicationUpdateSchema = insuranceApplicationSchema
     id: z.string().uuid(),
   })
 
+export const careerApplicationSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required.').max(60),
+  last_name: z.string().trim().min(1, 'Last name is required.').max(60),
+  email: EMAIL,
+  phone: PHONE.optional(),
+  position: z.string().trim().min(1, 'Please choose a role.').max(120),
+  location: z.string().trim().max(120).optional().nullable(),
+  work_authorization: z.string().trim().max(120).optional().nullable(),
+  linkedin_url: z
+    .string()
+    .trim()
+    .url('Enter a valid URL.')
+    .max(300)
+    .optional()
+    .or(z.literal('')),
+  portfolio_url: z
+    .string()
+    .trim()
+    .url('Enter a valid URL.')
+    .max(300)
+    .optional()
+    .or(z.literal('')),
+  cover_letter: z.string().trim().max(5000).optional().nullable(),
+})
+
 export function formatZodError(error: z.ZodError) {
   return error.flatten().fieldErrors
 }

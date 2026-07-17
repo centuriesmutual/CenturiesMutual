@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-const PROTECTED_PREFIXES = ['/wallet', '/dashboard', '/admin', '/insurance-application']
+// Note: /admin is intentionally NOT listed here. The admin portal renders its
+// own login view and all admin data is served only by admin-gated API routes
+// (ADMIN_EMAILS allowlist + service role). Adding it here would redirect the
+// portal to the member /login page before its own login can render.
+const PROTECTED_PREFIXES = ['/wallet', '/dashboard', '/insurance-application']
 const AUTH_PAGES = ['/login', '/createaccount', '/create-account', '/signup']
 
 // Subdomains that map to their own route tree in this single app.

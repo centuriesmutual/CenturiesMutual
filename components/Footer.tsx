@@ -20,7 +20,7 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
       { href: '/medicare-supplement', label: 'Medicare Supplement' },
       { href: '/medicare-advantage', label: 'Medicare Advantage' },
       { href: '/group-plans', label: 'Group Plans' },
-      { href: '/dental', label: 'Dental' },
+      { href: '/dental', label: 'Dental & Vision' },
     ],
   },
   {
@@ -38,23 +38,23 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
       { href: '/newspaper', label: 'Newspaper' },
       { href: '/wintergarden', label: 'Wintergarden' },
       { href: '/my-brothers-keeper', label: 'My Brothers Keeper' },
+      { href: 'https://thriftmeds.com', label: 'Thrift Meds', external: true },
     ],
   },
   {
     title: 'Documents',
     links: [
+      { href: '/developers', label: 'Developers' },
       { href: '/forms', label: 'Forms' },
       { href: '/taxes', label: 'Taxes' },
-      { href: '/find-a-doctor', label: 'Find a Provider' },
-      { href: '/carrier-portal', label: 'Carrier Portal' },
+      { href: '/legal', label: 'Legal' },
     ],
   },
   {
     title: 'Company',
     links: [
       { href: '/help-desk', label: 'Help Desk' },
-      { href: '/legal', label: 'Legal' },
-      { href: '/developers', label: 'Developers' },
+      { href: '/careers', label: 'Careers' },
       { href: '/investor-relations', label: 'Investor Relations' },
     ],
   },
