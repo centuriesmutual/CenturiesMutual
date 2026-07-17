@@ -17,6 +17,7 @@ import {
   type ServiceFlowId,
 } from '@/components/dashboard/service-flows'
 import { TransactionHistory } from '@/components/dashboard/transaction-history'
+import { RewardsWalletSection } from '@/components/dashboard/rewards-wallet-section'
 import { EnrollmentWelcome } from '@/components/dashboard/enrollment-welcome'
 import { YoutubeExperience } from '@/components/dashboard/youtube-experience'
 import {
@@ -462,6 +463,8 @@ export default function WalletDashboard() {
                     Transaction History
                   </button>
                 </div>
+
+                <RewardsWalletSection />
               </motion.div>
             ) : null}
 
