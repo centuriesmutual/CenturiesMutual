@@ -1,0 +1,141 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  NODE_VERSION: "20.x"
+  PM2_PROCESS_NAME: "centuriesmutual"
+  DEPLOY_SERVER: "158.69.215.151"
+  DEPLOY_USER: "ubuntu"
+
+cache:
+  paths:
+    - node_modules/
+    - .next/
+
+build:
+  stage: build
+  image: node:20
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git
+  script:
+    - echo "Building application..."
+    - npm ci
+    - npm run build
+    - echo "Build completed successfully"
+  artifacts:
+    paths:
+      - .next/
+      - node_modules/
+      - package.json
+      - package-lock.json
+      - app/
+      - components/
+      - lib/
+      - public/
+      - tailwind.config.js
+    expire_in: 1 hour
+  only:
+    - main
+    - master
+    - develop
+
+deploy:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client rsync
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $DEPLOY_SERVER >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - echo "Deploying to $DEPLOY_ENVIRONMENT environment..."
+    - |
+      ssh $DEPLOY_USER@$DEPLOY_SERVER << 'ENDSSH'
+        set -e
+        
+        echo "Creating deployment directory..."
+        sudo mkdir -p /var/www/centuriesmutual-home
+        sudo mkdir -p /var/www/centuriesmutual-editor
+        sudo mkdir -p /var/www/centuriesmutual-admin
+        sudo mkdir -p /var/www/centuriesmutual-campaign
+        
+        echo "Setting up directory permissions..."
+        sudo chown -R $USER:$USER /var/www/centuriesmutual-*
+        
+        echo "Deployment directories ready"
+      ENDSSH
+    - echo "Syncing files to server..."
+    - rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" \
+        .next/ \
+        node_modules/ \
+        package.json \
+        package-lock.json \
+        app/ \
+        components/ \
+        lib/ \
+        public/ \
+        tailwind.config.js \
+        $DEPLOY_USER@$DEPLOY_SERVER:/var/www/centuriesmutual-home/
+    - |
+      ssh $DEPLOY_USER@$DEPLOY_SERVER << 'ENDSSH'
+        set -e
+        
+        cd /var/www/centuriesmutual-home
+        
+        echo "Installing production dependencies..."
+        npm ci --production
+        
+        echo "Setting up environment files..."
+        if [ ! -f .env.production ]; then
+          echo "Creating .env.production from template..."
+          cat > .env.production << 'ENVFILE'
+# Auth0 Configuration
+AUTH0_SECRET=$AUTH0_SECRET
+AUTH0_BASE_URL=https://centuriesmutual.com
+AUTH0_ISSUER_BASE_URL=https://dev-a6tfhplq28n7ket3.us.auth0.com
+AUTH0_CLIENT_ID=$AUTH0_CLIENT_ID
+AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET
+
+# Next.js Configuration
+NODE_ENV=production
+NEXT_PUBLIC_APP_URL=https://centuriesmutual.com
+
+# Box API Configuration (optional)
+BOX_CLIENT_ID=$BOX_CLIENT_ID
+BOX_CLIENT_SECRET=$BOX_CLIENT_SECRET
+BOX_PUBLIC_KEY_ID=$BOX_PUBLIC_KEY_ID
+BOX_ENTERPRISE_ID=$BOX_ENTERPRISE_ID
+BOX_FOLDER_ID=$BOX_FOLDER_ID
+BOX_PRIVATE_KEY=$BOX_PRIVATE_KEY
+BOX_PASSPHRASE=$BOX_PASSPHRASE
+
+# Analytics
+NEXT_PUBLIC_VERCEL_ANALYTICS_ID=
+ENVFILE
+        fi
+        
+        echo "Restarting PM2 applications..."
+        pm2 restart centuriesmutual-home || pm2 start npm --name "centuriesmutual-home" -- start
+        pm2 restart centuriesmutual-editor || true
+        pm2 restart centuriesmutual-admin || true
+        pm2 restart centuriesmutual-campaign || true
+        
+        echo "Saving PM2 configuration..."
+        pm2 save
+        
+        echo "Deployment completed successfully!"
+      ENDSSH
+    - echo "Deployment finished"
+  environment:
+    name: production
+    url: https://centuriesmutual.com
+  only:
+    - main
+  when: on_success
+
+
+
