@@ -1,10 +1,13 @@
 import type { Config } from 'tailwindcss'
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const forms = require('@tailwindcss/forms')
 
 const config: Config = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
@@ -34,7 +37,9 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  // `strategy: 'class'` keeps the forms reset opt-in (via form-* classes) so it
+  // doesn't restyle the main site's existing inputs; the campaign app opts in.
+  plugins: [forms({ strategy: 'class' })],
 }
 
 export default config
