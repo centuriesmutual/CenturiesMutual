@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Settings, RefreshCw, LogOut, SlidersHorizontal } from 'lucide-react'
 import {
   AcaEnrollmentFlagsPanel,
   AcaStateLicensingPanel,
@@ -138,12 +139,11 @@ const EMPTY_LISTING = {
   published: true,
 }
 
-const WORKSPACES: { id: WorkspaceId; label: string; hint: string }[] = [
-  { id: 'overview', label: 'Overview', hint: 'Command center' },
-  { id: 'files', label: 'Files', hint: 'Application vault' },
-  { id: 'employees', label: 'Employees', hint: 'Hiring & BI' },
-  { id: 'operations', label: 'Operations', hint: 'ACA controls' },
-  { id: 'ledger', label: 'Ledger', hint: 'Hyperledger' },
+const NAV_TABS: { id: Exclude<WorkspaceId, 'operations'>; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'files', label: 'Clients' },
+  { id: 'employees', label: 'Employees' },
+  { id: 'ledger', label: 'Ledger' },
 ]
 
 /* ---------------------------------------------------------------------------
@@ -267,12 +267,14 @@ export function AdminDashboard({
   email: string | null
   onSignOut: () => void | Promise<void>
 }) {
-  const [workspace, setWorkspace] = useState<WorkspaceId>('files')
+  const [workspace, setWorkspace] = useState<WorkspaceId>('overview')
   const [folder, setFolder] = useState<FileFolderId>('all')
   const [employeePanel, setEmployeePanel] = useState<EmployeePanelId>('overview')
   const [opsPanel, setOpsPanel] = useState<'flags' | 'states'>('flags')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
 
   const [applications, setApplications] = useState<Application[]>([])
   const [careers, setCareers] = useState<Career[]>([])
@@ -335,6 +337,38 @@ export function AdminDashboard({
   useEffect(() => {
     void loadAll()
   }, [loadAll])
+
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onPointer = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSettingsOpen(false)
+    }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [settingsOpen])
+
+  const clientsBadge = useMemo(
+    () =>
+      applications.filter((a) =>
+        a.application_status === 'submitted' || a.application_status === 'under_review',
+      ).length,
+    [applications],
+  )
+
+  const goHome = () => {
+    setWorkspace('overview')
+    setSettingsOpen(false)
+    void loadAll()
+  }
 
   const acaApplications = useMemo(
     () => applications.filter(isAcaApplication),
@@ -487,12 +521,6 @@ export function AdminDashboard({
     setFlash('Hiring pipeline updated.')
   }
 
-  const openFolder = (id: FileFolderId) => {
-    setFolder(id)
-    setWorkspace('files')
-    setSelectedId(null)
-  }
-
   return (
     <main className="min-h-dvh bg-[radial-gradient(ellipse_at_12%_0%,rgba(201,169,97,0.14)_0%,transparent_42%),linear-gradient(165deg,#E8DFD6_0%,#F7F3EE_48%,#EFE8DF_100%)]">
       <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
@@ -500,38 +528,71 @@ export function AdminDashboard({
         <div className="relative mb-10 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="m-0 font-sans text-[10px] font-semibold uppercase tracking-[0.28em] text-[#C9A961]">
-              Centuries Mutual · Administration
+              Centuries Mutual · Office
             </p>
-            <h1
-              className="m-0 mt-2 font-medium tracking-tight text-[#0F3D2E]"
+            <button
+              type="button"
+              onClick={goHome}
+              className="m-0 mt-2 block cursor-pointer border-0 bg-transparent p-0 text-left font-medium tracking-tight text-[#0F3D2E] transition hover:text-[#245C45]"
               style={{ ...displayFont, fontSize: 'clamp(1.85rem,3vw,2.45rem)' }}
+              title="Refresh and return to Overview"
             >
-              Admin Workspace
-            </h1>
-            <p className="m-0 mt-2 max-w-xl font-sans text-[1.05rem] font-medium text-[#3d4a41]">
-              Application vault, hiring intelligence, and marketplace operations.
-            </p>
+              Administration
+            </button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {email ? (
-              <span className="rounded-[12px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-3.5 py-2 font-sans text-[0.75rem] font-semibold text-[#0F3D2E]">
-                {email}
-              </span>
-            ) : null}
             <button
               type="button"
               onClick={() => void loadAll()}
-              className="rounded-[12px] border border-[#0F3D2E]/18 bg-[#FAFCFB] px-3.5 py-2 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] transition hover:-translate-y-0.5 hover:border-[#0F3D2E] hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
+              aria-label="Refresh"
+              title="Refresh"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border-0 bg-transparent text-[#0F3D2E] transition hover:-translate-y-0.5 hover:text-[#245C45]"
             >
-              Refresh
+              <RefreshCw className="h-4 w-4" strokeWidth={2.25} />
             </button>
-            <button
-              type="button"
-              onClick={() => void onSignOut()}
-              className="rounded-[12px] bg-[#0F3D2E] px-3.5 py-2 font-sans text-[0.8125rem] font-semibold text-[#FAFCFB] shadow-[0_8px_20px_rgba(15,61,46,0.18)] transition hover:bg-[#0A2E22]"
-            >
-              Sign out
-            </button>
+            <div className="relative" ref={settingsRef}>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((o) => !o)}
+                aria-label="Settings"
+                aria-expanded={settingsOpen}
+                title="Settings"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#0F3D2E]/18 bg-[#FAFCFB] text-[#0F3D2E] transition hover:-translate-y-0.5 hover:border-[#0F3D2E] hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
+              >
+                <Settings className="h-4 w-4" strokeWidth={2.25} />
+              </button>
+              {settingsOpen ? (
+                <div className="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-[14px] border border-[#0F3D2E]/12 bg-[#FAFCFB] shadow-[0_16px_40px_rgba(15,61,46,0.16)]">
+                  {email ? (
+                    <p className="m-0 truncate border-b border-[#0F3D2E]/08 px-3.5 py-2.5 font-sans text-[0.6875rem] text-[#55655D]">
+                      {email}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettingsOpen(false)
+                      setWorkspace('operations')
+                    }}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06]"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
+                    Operations
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSettingsOpen(false)
+                      void onSignOut()
+                    }}
+                    className="flex w-full items-center gap-2.5 border-t border-[#0F3D2E]/08 px-3.5 py-2.5 text-left font-sans text-[0.8125rem] font-semibold text-[#B42318] transition hover:bg-[#B42318]/[0.06]"
+                  >
+                    <LogOut className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
+                    Sign out
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div
             aria-hidden
@@ -539,30 +600,37 @@ export function AdminDashboard({
           />
         </div>
 
-        {/* Office-style workspace nav pills */}
-        <nav className="mb-8 overflow-x-auto rounded-[16px] border border-[#0F3D2E]/10 bg-[#FAFCFB] p-1.5 shadow-[0_4px_20px_rgba(15,61,46,0.05)]">
-          <div className="flex min-w-max gap-1">
-            {WORKSPACES.map((w) => (
-              <button
-                key={w.id}
-                type="button"
-                onClick={() => setWorkspace(w.id)}
-                className={`rounded-[12px] px-4 py-2.5 font-sans text-[0.8125rem] font-semibold transition ${
-                  workspace === w.id
-                    ? 'bg-[linear-gradient(135deg,#0F3D2E_0%,#0F3D2E_100%)] text-[#FAFCFB] shadow-[0_4px_12px_rgba(15,61,46,0.22)]'
-                    : 'text-[#55655D] hover:bg-[#0F3D2E]/[0.06] hover:text-[#0F3D2E]'
-                }`}
-              >
-                {w.label}
-                <span
-                  className={`ml-2 hidden font-sans text-[0.6875rem] font-medium sm:inline ${
-                    workspace === w.id ? 'text-white/65' : 'text-[#8A958C]'
+        {/* Workspace nav — minimal folder tabs */}
+        <nav className="mb-8" aria-label="Office sections">
+          <div className="flex items-end gap-1 overflow-x-auto border-b border-[#B89A78] px-0.5">
+            {NAV_TABS.map((w) => {
+              const active = workspace === w.id
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setWorkspace(w.id)}
+                  className={`relative -mb-px flex shrink-0 items-center gap-1.5 rounded-t-[10px] border border-b-0 px-4 py-2.5 font-sans text-[0.8125rem] font-semibold transition ${
+                    active
+                      ? 'z-10 border-[#B89A78] bg-[#F7F3EE] text-[#0F3D2E]'
+                      : 'z-0 border-transparent bg-[#C9B396]/55 text-[#0F3D2E]/70 hover:bg-[#C9B396]/85 hover:text-[#0F3D2E]'
                   }`}
                 >
-                  {w.hint}
-                </span>
-              </button>
-            ))}
+                  {w.label}
+                  {w.id === 'files' ? (
+                    <span
+                      className={`inline-flex min-w-[1.15rem] items-center justify-center rounded-full px-1.5 py-0.5 font-sans text-[0.625rem] font-bold leading-none ${
+                        active
+                          ? 'bg-[#0F3D2E] text-[#FAFCFB]'
+                          : 'bg-[#0F3D2E]/75 text-[#FAFCFB]'
+                      }`}
+                    >
+                      {clientsBadge > 99 ? '99+' : clientsBadge}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
           </div>
         </nav>
 
@@ -591,20 +659,7 @@ export function AdminDashboard({
               transition={{ duration: 0.22 }}
             >
               {workspace === 'overview' && (
-                <OverviewPanel
-                  applications={applications}
-                  aca={acaApplications.length}
-                  medicare={medicareApplications.length}
-                  enrolled={enrollments.length}
-                  careers={careers}
-                  listings={listings}
-                  sales={salesStats}
-                  onOpenFiles={openFolder}
-                  onOpenEmployees={(panel) => {
-                    setEmployeePanel(panel)
-                    setWorkspace('employees')
-                  }}
-                />
+                <OverviewPanel applications={applications} careers={careers} />
               )}
 
               {workspace === 'files' && (
@@ -614,6 +669,10 @@ export function AdminDashboard({
                   rows={folderRows}
                   selected={selected}
                   query={query}
+                  sales={salesStats}
+                  acaCount={acaApplications.length}
+                  medicareCount={medicareApplications.length}
+                  enrolledCount={enrollments.length}
                   onQuery={setQuery}
                   onFolder={(id) => {
                     setFolder(id)
@@ -692,170 +751,215 @@ export function AdminDashboard({
 
 function OverviewPanel({
   applications,
-  aca,
-  medicare,
-  enrolled,
   careers,
-  listings,
-  sales,
-  onOpenFiles,
-  onOpenEmployees,
 }: {
   applications: Application[]
-  aca: number
-  medicare: number
-  enrolled: number
   careers: Career[]
-  listings: CareerListingRow[]
-  sales: {
-    last7: number
-    conversion: number
-    enrolled: number
-    bySource: Record<string, number>
-  }
-  onOpenFiles: (folder: FileFolderId) => void
-  onOpenEmployees: (panel: EmployeePanelId) => void
 }) {
-  const tiles = [
-    {
-      label: 'All applications',
-      value: applications.length,
-      sub: `${sales.last7} in last 7 days`,
-      action: () => onOpenFiles('all'),
-    },
-    {
-      label: 'ACA / Marketplace',
-      value: aca,
-      sub: 'centuriesmutual.com/enroll',
-      action: () => onOpenFiles('aca'),
-    },
-    {
-      label: 'Medicare.Reviews',
-      value: medicare,
-      sub: 'External medicare funnel',
-      action: () => onOpenFiles('medicare'),
-    },
-    {
-      label: 'Active enrollments',
-      value: enrolled,
-      sub: `${sales.conversion}% conversion`,
-      action: () => onOpenFiles('enrolled'),
-    },
-  ]
-
-  const apps = [
-    { label: 'Application vault', hint: 'Browse as a file system', onClick: () => onOpenFiles('all'), tone: 'bg-[#0F3D2E]' },
-    { label: 'Hiring pipeline', hint: `${careers.length} career apps`, onClick: () => onOpenEmployees('hiring'), tone: 'bg-[#1a4d38]' },
-    { label: 'Sales & marketing', hint: 'Source mix & conversion', onClick: () => onOpenEmployees('sales'), tone: 'bg-[#245C45]' },
-    { label: 'Job board', hint: `${listings.filter((l) => l.published).length} live roles`, onClick: () => onOpenEmployees('job-board'), tone: 'bg-[#2F6B52]' },
-  ]
-
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {tiles.map((t) => (
+      <OfficeCalendar applications={applications} careers={careers} />
+    </div>
+  )
+}
+
+function OfficeCalendar({
+  applications,
+  careers,
+}: {
+  applications: Application[]
+  careers: Career[]
+}) {
+  const [cursor, setCursor] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
+  const [selectedDay, setSelectedDay] = useState<number | null>(() => new Date().getDate())
+
+  const year = cursor.getFullYear()
+  const month = cursor.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstWeekday = new Date(year, month, 1).getDay()
+  const today = new Date()
+
+  const monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ]
+
+  const eventsByDay = useMemo(() => {
+    const map = new Map<number, { apps: number; careers: number }>()
+    const bump = (iso: string, kind: 'apps' | 'careers') => {
+      const d = new Date(iso)
+      if (d.getFullYear() !== year || d.getMonth() !== month) return
+      const day = d.getDate()
+      const cur = map.get(day) ?? { apps: 0, careers: 0 }
+      cur[kind] += 1
+      map.set(day, cur)
+    }
+    for (const a of applications) bump(a.created_at, 'apps')
+    for (const c of careers) bump(c.created_at, 'careers')
+    return map
+  }, [applications, careers, year, month])
+
+  const selectedEvents = selectedDay != null ? eventsByDay.get(selectedDay) : null
+  const selectedLabel =
+    selectedDay != null
+      ? new Date(year, month, selectedDay).toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : null
+
+  const cells: (number | null)[] = []
+  for (let i = 0; i < firstWeekday; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  return (
+    <div className={`${cardClass} !p-0 overflow-hidden`}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-5 py-4">
+        <div>
+          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-[#C9A961]">
+            Calendar
+          </p>
+          <h2 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.45rem' }}>
+            {monthNames[month]} {year}
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
           <button
-            key={t.label}
             type="button"
-            onClick={t.action}
-            className={`${cardClass} text-left transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(15,61,46,0.35)]`}
+            aria-label="Previous month"
+            onClick={() => setCursor(new Date(year, month - 1, 1))}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] font-sans text-[0.875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
           >
-            <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#55655D]">
-              {t.label}
-            </p>
-            <p className="m-0 mt-2 font-sans text-[2rem] font-semibold leading-none text-[#0F3D2E]">
-              {t.value}
-            </p>
-            <p className="m-0 mt-2 font-sans text-[0.75rem] text-[#55655D]">{t.sub}</p>
+            ‹
           </button>
-        ))}
-      </div>
-
-      <div className={cardClass}>
-        <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-[#C9A961]">
-          Quick launch
-        </p>
-        <h2 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.35rem' }}>
-          Workspace apps
-        </h2>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {apps.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              onClick={a.onClick}
-              className="group flex flex-col items-start rounded-[18px] border border-[#0F3D2E]/08 bg-[#FAFCFB] p-4 text-left transition hover:border-[#0F3D2E]/25 hover:bg-white"
-            >
-              <span className={`mb-3 inline-flex h-11 w-11 items-center justify-center rounded-[14px] ${a.tone} text-[0.75rem] font-bold text-white`}>
-                CM
-              </span>
-              <span className="font-sans text-[0.875rem] font-semibold text-[#0F3D2E] group-hover:text-[#0F3D2E]">
-                {a.label}
-              </span>
-              <span className="mt-1 font-sans text-[0.75rem] text-[#55655D]">{a.hint}</span>
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date()
+              setCursor(new Date(now.getFullYear(), now.getMonth(), 1))
+              setSelectedDay(now.getDate())
+            }}
+            className="rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            onClick={() => setCursor(new Date(year, month + 1, 1))}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] font-sans text-[0.875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
+          >
+            ›
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className={cardClass}>
-          <h3 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
-            Intake by source
-          </h3>
-          <div className="mt-4 space-y-3">
-            {Object.entries(sales.bySource).length === 0 ? (
-              <p className="m-0 font-sans text-[0.875rem] text-[#55655D]">No applications yet.</p>
-            ) : (
-              Object.entries(sales.bySource)
-                .sort((a, b) => b[1] - a[1])
-                .map(([src, n]) => {
-                  const pct = applications.length
-                    ? Math.round((n / applications.length) * 100)
-                    : 0
-                  return (
-                    <div key={src}>
-                      <div className="mb-1 flex justify-between font-sans text-[0.8125rem]">
-                        <span className="font-semibold text-[#0F3D2E]">{src}</span>
-                        <span className="text-[#55655D]">
-                          {n} · {pct}%
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-[#0F3D2E]/10">
-                        <div
-                          className="h-full rounded-full bg-[#0F3D2E]"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })
-            )}
-          </div>
-        </div>
-
-        <div className={cardClass}>
-          <h3 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
-            Hiring snapshot
-          </h3>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {[
-              { label: 'Open applications', value: careers.filter((c) => !['hired', 'declined', 'archived'].includes(c.status)).length },
-              { label: 'Hired', value: careers.filter((c) => c.status === 'hired').length },
-              { label: 'Interview / offer', value: careers.filter((c) => c.status === 'interview' || c.status === 'offer').length },
-              { label: 'Published roles', value: listings.filter((l) => l.published).length },
-            ].map((s) => (
-              <div key={s.label} className="rounded-[14px] bg-[#FAFCFB] px-3 py-3">
-                <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
-                  {s.label}
-                </p>
-                <p className="m-0 mt-1 font-sans text-[1.5rem] font-semibold text-[#0F3D2E]">
-                  {s.value}
-                </p>
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.8fr)]">
+        <div className="p-4 sm:p-5">
+          <div className="mb-2 grid grid-cols-7 gap-1">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div
+                key={d}
+                className="py-1 text-center font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]"
+              >
+                {d}
               </div>
             ))}
           </div>
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((day, i) => {
+              if (day == null) {
+                return <div key={`e-${i}`} className="aspect-square min-h-[2.75rem]" />
+              }
+              const ev = eventsByDay.get(day)
+              const isToday =
+                today.getFullYear() === year &&
+                today.getMonth() === month &&
+                today.getDate() === day
+              const isSelected = selectedDay === day
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => setSelectedDay(day)}
+                  className={`relative flex aspect-square min-h-[2.75rem] flex-col items-center justify-start rounded-[12px] pt-1.5 font-sans text-[0.8125rem] transition ${
+                    isSelected
+                      ? 'bg-[#0F3D2E] text-[#FAFCFB] shadow-[0_4px_12px_rgba(15,61,46,0.25)]'
+                      : isToday
+                        ? 'bg-[#C9A961]/25 font-semibold text-[#0F3D2E]'
+                        : 'text-[#0F3D2E] hover:bg-[#0F3D2E]/[0.06]'
+                  }`}
+                >
+                  <span>{day}</span>
+                  {ev && (ev.apps > 0 || ev.careers > 0) ? (
+                    <span className="mt-auto mb-1.5 flex gap-0.5">
+                      {ev.apps > 0 ? (
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-[#C9A961]' : 'bg-[#0F3D2E]'}`}
+                        />
+                      ) : null}
+                      {ev.careers > 0 ? (
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-[#E8DFD6]' : 'bg-[#C9A961]'}`}
+                        />
+                      ) : null}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
         </div>
+
+        <aside className="border-t border-[#0F3D2E]/10 bg-[#F7F3EE] p-5 lg:border-l lg:border-t-0">
+          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+            Day detail
+          </p>
+          <p className="m-0 mt-1 font-sans text-[0.9375rem] font-semibold text-[#0F3D2E]">
+            {selectedLabel ?? 'Select a day'}
+          </p>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-[14px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3.5 py-3">
+              <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+                Client applications
+              </p>
+              <p className="m-0 mt-1 font-sans text-[1.75rem] font-semibold leading-none text-[#0F3D2E]">
+                {selectedEvents?.apps ?? 0}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3.5 py-3">
+              <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+                Career applications
+              </p>
+              <p className="m-0 mt-1 font-sans text-[1.75rem] font-semibold leading-none text-[#0F3D2E]">
+                {selectedEvents?.careers ?? 0}
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-3 font-sans text-[0.6875rem] text-[#55655D]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#0F3D2E]" /> Clients
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#C9A961]" /> Careers
+            </span>
+          </div>
+        </aside>
       </div>
     </div>
   )
@@ -871,6 +975,10 @@ function FilesWorkspace({
   rows,
   selected,
   query,
+  sales,
+  acaCount,
+  medicareCount,
+  enrolledCount,
   onQuery,
   onFolder,
   onSelect,
@@ -881,6 +989,10 @@ function FilesWorkspace({
   rows: Application[]
   selected: Application | null
   query: string
+  sales: { last7: number; conversion: number }
+  acaCount: number
+  medicareCount: number
+  enrolledCount: number
   onQuery: (q: string) => void
   onFolder: (id: FileFolderId) => void
   onSelect: (id: string) => void
@@ -896,20 +1008,82 @@ function FilesWorkspace({
 
   const activePath = folders.find((f) => f.id === folder)?.path ?? '/Applications'
 
+  const miniStats: {
+    id: FileFolderId
+    label: string
+    value: number
+    sub: string
+  }[] = [
+    {
+      id: 'all',
+      label: 'All',
+      value: counts.all,
+      sub: `${sales.last7} / 7d`,
+    },
+    {
+      id: 'aca',
+      label: 'ACA',
+      value: acaCount,
+      sub: 'Marketplace',
+    },
+    {
+      id: 'medicare',
+      label: 'Medicare',
+      value: medicareCount,
+      sub: 'Reviews',
+    },
+    {
+      id: 'enrolled',
+      label: 'Active',
+      value: enrolledCount,
+      sub: `${sales.conversion}%`,
+    },
+  ]
+
   return (
     <div className="overflow-hidden rounded-[20px] border border-[#0F3D2E]/10 bg-[#FAFCFB] shadow-[0_4px_20px_rgba(15,61,46,0.05)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-4 py-3.5">
-        <div>
-          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-[#C9A961]">
-            File system
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-4 py-3">
+        <div className="mr-1 hidden min-w-0 shrink-0 sm:block">
+          <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+            Clients
           </p>
-          <p className="m-0 mt-0.5 font-mono text-[0.8125rem] text-[#0F3D2E]">{activePath}</p>
+          <p className="m-0 truncate font-mono text-[0.6875rem] text-[#0F3D2E]">{activePath}</p>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {miniStats.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onFolder(s.id)}
+              className={`min-w-[4.5rem] rounded-[10px] border px-2 py-1.5 text-left transition ${
+                folder === s.id
+                  ? 'border-[#0F3D2E] bg-[#0F3D2E] text-[#FAFCFB]'
+                  : 'border-[#0F3D2E]/12 bg-[#FAFCFB] text-[#0F3D2E] hover:border-[#0F3D2E]/30'
+              }`}
+            >
+              <p
+                className={`m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] ${
+                  folder === s.id ? 'text-white/70' : 'text-[#55655D]'
+                }`}
+              >
+                {s.label}
+              </p>
+              <p className="m-0 font-sans text-[0.9375rem] font-semibold leading-tight">{s.value}</p>
+              <p
+                className={`m-0 truncate font-sans text-[0.5625rem] ${
+                  folder === s.id ? 'text-white/60' : 'text-[#55655D]'
+                }`}
+              >
+                {s.sub}
+              </p>
+            </button>
+          ))}
         </div>
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           placeholder="Search name, email, state, source…"
-          className="w-full max-w-sm rounded-[12px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-72"
+          className="w-full max-w-xs rounded-[12px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-56"
         />
       </div>
 
@@ -1173,6 +1347,35 @@ function EmployeesWorkspace({
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+        <button
+          type="button"
+          onClick={() => onPanel('hiring')}
+          className="group flex flex-col items-start rounded-[16px] border border-[#0F3D2E]/10 bg-[#FAFCFB] p-3.5 text-left shadow-[0_4px_16px_rgba(15,61,46,0.05)] transition hover:-translate-y-0.5 hover:border-[#0F3D2E]/25"
+        >
+          <span className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-[#1a4d38] text-[0.6875rem] font-bold text-white">
+            CM
+          </span>
+          <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">Hiring pipeline</span>
+          <span className="mt-0.5 font-sans text-[0.6875rem] text-[#55655D]">
+            {careers.length} career apps
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onPanel('job-board')}
+          className="group flex flex-col items-start rounded-[16px] border border-[#0F3D2E]/10 bg-[#FAFCFB] p-3.5 text-left shadow-[0_4px_16px_rgba(15,61,46,0.05)] transition hover:-translate-y-0.5 hover:border-[#0F3D2E]/25"
+        >
+          <span className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-[#2F6B52] text-[0.6875rem] font-bold text-white">
+            CM
+          </span>
+          <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">Job board</span>
+          <span className="mt-0.5 font-sans text-[0.6875rem] text-[#55655D]">
+            {listings.filter((l) => l.published).length} live roles
+          </span>
+        </button>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {tabs.map((t) => (
           <button
