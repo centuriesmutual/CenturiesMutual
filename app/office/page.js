@@ -25,13 +25,13 @@ export default function OfficeLogin() {
       })
       if (signInError || !data.user) {
         setError('Invalid email or password.')
-        setLoading(false)
         return
       }
       router.push('/office')
       router.refresh()
     } catch {
       setError('Could not sign in. Please try again.')
+    } finally {
       setLoading(false)
     }
   }

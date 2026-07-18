@@ -23,13 +23,13 @@ export default function LoginPage() {
       })
       if (signInError || !data.user) {
         setError('Invalid email or password.')
-        setLoading(false)
         return
       }
       router.push('/dashboard')
       router.refresh()
     } catch {
       setError('Could not sign in. Please try again.')
+    } finally {
       setLoading(false)
     }
   }

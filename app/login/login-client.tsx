@@ -67,7 +67,6 @@ export default function LoginClient() {
       const result = await signInAction({ email, password })
       if (result.ok === false) {
         setError(result.error)
-        setIsSubmitting(false)
         return
       }
 
@@ -85,7 +84,6 @@ export default function LoginClient() {
             ? 'Please verify your email before signing in.'
             : 'Authentication failed. Please try again.',
         )
-        setIsSubmitting(false)
         return
       }
 
@@ -102,6 +100,7 @@ export default function LoginClient() {
       router.refresh()
     } catch {
       setError('An error occurred during login. Please try again.')
+    } finally {
       setIsSubmitting(false)
     }
   }

@@ -5,16 +5,15 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 type Props = {
-  /** True when a user is signed in but not on the admin allowlist. */
-  notAuthorized?: boolean
-  email?: string | null
-  onSignedIn: () => void | Promise<void>
-  onSignOut: () => void | Promise<void>
+  /** Optional message shown when a prior attempt was rejected. */
+  initialError?: string | null
+  /** Returns true when the signed-in user is authorized for admin. */
+  onSignedIn: () => boolean | Promise<boolean>
 }
 
-export function AdminLogin({ notAuthorized, email, onSignedIn, onSignOut }: Props) {
+export function AdminLogin({ initialError = null, onSignedIn }: Props) {
   const [form, setForm] = useState({ email: '', password: '' })
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,12 +32,17 @@ export function AdminLogin({ notAuthorized, email, onSignedIn, onSignOut }: Prop
             ? 'This account email is not confirmed yet.'
             : 'Invalid email or password.',
         )
-        setLoading(false)
         return
       }
-      await onSignedIn()
+
+      const authorized = await onSignedIn()
+      if (!authorized) {
+        await supabase.auth.signOut()
+        setError('Invalid email or password.')
+      }
     } catch {
       setError('Something went wrong. Please try again.')
+    } finally {
       setLoading(false)
     }
   }
@@ -75,75 +79,56 @@ export function AdminLogin({ notAuthorized, email, onSignedIn, onSignOut }: Prop
             </p>
           </div>
 
-          {notAuthorized ? (
-            <div className="rounded-2xl border border-[#B42318]/15 bg-[#B42318]/[0.06] p-5 text-center">
-              <p className="mb-1 font-sans text-[0.9375rem] font-semibold text-[#B42318]">
-                Not authorized
-              </p>
-              <p className="mb-4 font-sans text-[0.875rem] text-[#55655D]">
-                {email ? <span className="font-medium">{email}</span> : 'This account'} is
-                not on the admin allowlist. Sign in with an authorized account.
-              </p>
-              <button
-                type="button"
-                onClick={() => void onSignOut()}
-                className="inline-flex items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.875rem] font-semibold text-[#FAFCFB] transition hover:bg-[#0A2E22]"
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label
+                htmlFor="admin-email"
+                className="mb-1.5 block font-sans text-[0.8125rem] font-semibold text-[#14432A]"
               >
-                Sign out
-              </button>
+                Email address
+              </label>
+              <input
+                id="admin-email"
+                type="email"
+                required
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="Enter your email"
+                className="w-full rounded-[10px] border border-[#14432A]/15 bg-white px-3.5 py-2.5 font-sans text-[0.9375rem] text-[#14432A] outline-none transition focus:border-[#0F3D2E] focus:ring-2 focus:ring-[#0F3D2E]/15"
+              />
             </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label
-                  htmlFor="admin-email"
-                  className="mb-1.5 block font-sans text-[0.8125rem] font-semibold text-[#14432A]"
-                >
-                  Email address
-                </label>
-                <input
-                  id="admin-email"
-                  type="email"
-                  required
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  placeholder="Enter your email"
-                  className="w-full rounded-[10px] border border-[#14432A]/15 bg-white px-3.5 py-2.5 font-sans text-[0.9375rem] text-[#14432A] outline-none transition focus:border-[#0F3D2E] focus:ring-2 focus:ring-[#0F3D2E]/15"
-                />
-              </div>
-              <div className="mb-5">
-                <label
-                  htmlFor="admin-password"
-                  className="mb-1.5 block font-sans text-[0.8125rem] font-semibold text-[#14432A]"
-                >
-                  Password
-                </label>
-                <input
-                  id="admin-password"
-                  type="password"
-                  required
-                  value={form.password}
-                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  placeholder="Enter your password"
-                  className="w-full rounded-[10px] border border-[#14432A]/15 bg-white px-3.5 py-2.5 font-sans text-[0.9375rem] text-[#14432A] outline-none transition focus:border-[#0F3D2E] focus:ring-2 focus:ring-[#0F3D2E]/15"
-                />
-              </div>
-
-              {error ? (
-                <p className="mb-4 rounded-[10px] bg-[#B42318]/[0.08] px-4 py-3 font-sans text-[0.875rem] text-[#B42318]">
-                  {error}
-                </p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-3 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] disabled:cursor-not-allowed disabled:opacity-60"
+            <div className="mb-5">
+              <label
+                htmlFor="admin-password"
+                className="mb-1.5 block font-sans text-[0.8125rem] font-semibold text-[#14432A]"
               >
-                {loading ? 'Signing in…' : 'Sign In'}
-              </button>
-            </form>
-          )}
+                Password
+              </label>
+              <input
+                id="admin-password"
+                type="password"
+                required
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Enter your password"
+                className="w-full rounded-[10px] border border-[#14432A]/15 bg-white px-3.5 py-2.5 font-sans text-[0.9375rem] text-[#14432A] outline-none transition focus:border-[#0F3D2E] focus:ring-2 focus:ring-[#0F3D2E]/15"
+              />
+            </div>
+
+            {error ? (
+              <p className="mb-4 rounded-[10px] bg-[#B42318]/[0.08] px-4 py-3 font-sans text-[0.875rem] text-[#B42318]">
+                {error}
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-3 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
         </div>
         <p className="mt-4 text-center font-sans text-[0.75rem] text-white/50">
           Centuries Mutual · Secure admin access

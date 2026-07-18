@@ -15,18 +15,33 @@ export default function AdminPage() {
   const [session, setSession] = useState<SessionState | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     setLoading(true)
     try {
       const res = await fetch('/api/admin/me', { cache: 'no-store' })
       const data = await res.json().catch(() => ({}))
-      setSession({
+      const next = {
         authenticated: Boolean(data?.authenticated),
         admin: Boolean(data?.admin),
-        email: data?.email ?? null,
-      })
+        email: (data?.email as string | null) ?? null,
+      }
+      // Non-admin sessions should not trap the user on a sign-out screen —
+      // clear them so the login form stays available for another attempt.
+      if (next.authenticated && !next.admin) {
+        try {
+          const supabase = createClient()
+          await supabase.auth.signOut()
+        } catch {
+          /* ignore */
+        }
+        setSession({ authenticated: false, admin: false, email: null })
+        return false
+      }
+      setSession(next)
+      return next.admin
     } catch {
       setSession({ authenticated: false, admin: false, email: null })
+      return false
     } finally {
       setLoading(false)
     }
@@ -53,15 +68,8 @@ export default function AdminPage() {
     )
   }
 
-  if (!session?.authenticated || !session.admin) {
-    return (
-      <AdminLogin
-        notAuthorized={Boolean(session?.authenticated) && !session?.admin}
-        email={session?.email ?? null}
-        onSignedIn={refresh}
-        onSignOut={signOut}
-      />
-    )
+  if (!session?.admin) {
+    return <AdminLogin onSignedIn={refresh} />
   }
 
   return <AdminDashboard email={session.email} onSignOut={signOut} />
