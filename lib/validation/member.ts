@@ -236,7 +236,7 @@ export const medicareReviewsIngestSchema = z.object({
   marketing_id: z.string().trim().max(120).optional().or(z.literal('')),
   producer_id: z.string().trim().max(120).optional().or(z.literal('')),
   /** Free-form extras from medicare.reviews — stored inside notes JSON. */
-  meta: z.record(z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
   notes: z.string().trim().max(5000).optional().nullable(),
 })
 
