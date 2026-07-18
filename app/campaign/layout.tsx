@@ -2,7 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Marketing Dashboard',
+  title: 'Campaign',
   description: 'Manage and track your marketing campaigns',
 }
 
