@@ -18,7 +18,7 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
     links: [
       { href: '/individual-family-services', label: 'Individual & Family' },
       { href: '/medicare-supplement', label: 'Medicare Supplement' },
-      { href: '/medicare-advantage', label: 'Medicare Advantage' },
+      { href: 'https://www.medicare.reviews', label: 'Medicare Advantage', external: true },
       { href: '/group-plans', label: 'Group Plans' },
       { href: '/dental', label: 'Dental & Vision' },
     ],
@@ -35,7 +35,7 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
   {
     title: 'Neighborhood',
     links: [
-      { href: '/newspaper', label: 'Newspaper' },
+      { href: 'https://newspaper.centuriesmutual.com', label: 'Newspaper', external: true },
       { href: '/wintergarden', label: 'Wintergarden' },
       { href: '/my-brothers-keeper', label: 'My Brothers Keeper' },
       { href: 'https://thriftmeds.com', label: 'Thrift Meds', external: true },
@@ -54,7 +54,7 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
     title: 'Company',
     links: [
       { href: '/help-desk', label: 'Help Desk' },
-      { href: '/careers', label: 'Careers' },
+      { href: 'https://careers.centuriesmutual.com', label: 'Careers', external: true },
       { href: '/investor-relations', label: 'Investor Relations' },
     ],
   },
@@ -190,16 +190,10 @@ export default function Footer({
             </p>
             <div className="d-flex flex-wrap gap-3">
               <Link
-                href="/enrollment"
+                href="/enroll"
                 className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-[#C9A53E] text-decoration-none hover:text-white"
               >
                 Enroll
-              </Link>
-              <Link
-                href="/downloads"
-                className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70 text-decoration-none hover:text-white"
-              >
-                Get the App
               </Link>
               <Link
                 href="/help-desk"
