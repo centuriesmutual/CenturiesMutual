@@ -1,10 +1,9 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { SiteHeader } from '@/components/layout/site-header'
-import Footer from '@/components/Footer'
 
 /* ---------------------------------------------------------------------------
  * Reference data
@@ -15,6 +14,14 @@ const US_STATES = [
   'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
   'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC',
 ]
+
+type AcaConfig = {
+  openEnrollmentActive: boolean
+  specialEnrollmentEnabled: boolean
+  anyEnrollmentPathOpen: boolean
+  availableStates: { code: string; name: string }[]
+  states: { code: string; name: string; available: boolean }[]
+}
 
 // 2025 federal poverty guidelines (48 contiguous states + DC), annual, USD.
 const FPL_BASE = 15060
@@ -96,6 +103,8 @@ export function AcaEnrollment() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState<string | null>(null)
+  const [config, setConfig] = useState<AcaConfig | null>(null)
+  const [configLoading, setConfigLoading] = useState(true)
 
   // Step 0 — declarations
   const [enrollmentPeriod, setEnrollmentPeriod] = useState<'open' | 'sep' | ''>('')
@@ -107,9 +116,53 @@ export function AcaEnrollment() {
   // Step 1 — applicant
   const [applicant, setApplicant] = useState({
     first_name: '', middle_initial: '', last_name: '', date_of_birth: '', ssn: '', sex: '',
-    phone: '', email: '', address: '', apt: '', city: '', state: 'TX', zip: '', county: '',
+    phone: '', email: '', address: '', apt: '', city: '', state: '', zip: '', county: '',
     citizenship: 'U.S. citizen', tobacco: 'No',
   })
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/enrollment/aca/config', { cache: 'no-store' })
+        const data = await res.json().catch(() => ({}))
+        if (!active || !data?.ok) {
+          if (active) setConfigLoading(false)
+          return
+        }
+        const next: AcaConfig = {
+          openEnrollmentActive: Boolean(data.openEnrollmentActive),
+          specialEnrollmentEnabled: Boolean(data.specialEnrollmentEnabled),
+          anyEnrollmentPathOpen: Boolean(data.anyEnrollmentPathOpen),
+          availableStates: Array.isArray(data.availableStates) ? data.availableStates : [],
+          states: Array.isArray(data.states) ? data.states : [],
+        }
+        setConfig(next)
+        // Default to first available state when present.
+        if (next.availableStates[0]?.code) {
+          setApplicant((a) => (a.state ? a : { ...a, state: next.availableStates[0].code }))
+        }
+      } catch {
+        // leave config null — form will show unavailable messaging
+      } finally {
+        if (active) setConfigLoading(false)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    // Clear a selected path if the flag turns off.
+    if (!config) return
+    if (enrollmentPeriod === 'open' && !config.openEnrollmentActive) {
+      setEnrollmentPeriod('')
+    }
+    if (enrollmentPeriod === 'sep' && !config.specialEnrollmentEnabled) {
+      setEnrollmentPeriod('')
+    }
+  }, [config, enrollmentPeriod])
 
   // Step 2 — household & income
   const [household, setHousehold] = useState({
@@ -142,8 +195,17 @@ export function AcaEnrollment() {
   }
 
   const validateDeclarations = (): string | null => {
+    if (!config?.anyEnrollmentPathOpen) {
+      return 'ACA enrollment is not currently available. Please check back during an open enrollment window.'
+    }
     if (!enrollmentPeriod) return 'Tell us whether you are enrolling during Open Enrollment or a Special Enrollment Period.'
+    if (enrollmentPeriod === 'open' && !config.openEnrollmentActive) {
+      return 'Open Enrollment is not currently active.'
+    }
     if (enrollmentPeriod === 'sep') {
+      if (!config.specialEnrollmentEnabled) {
+        return 'Special Enrollment Period applications are not currently accepted.'
+      }
       if (!sepEvent) return 'Select the qualifying life event for your Special Enrollment Period.'
       if (!sepEventDate) return 'Enter the date of your qualifying life event.'
       if (!sepAttested) return 'You must attest that your SEP qualifying event is accurate.'
@@ -158,6 +220,12 @@ export function AcaEnrollment() {
     if (!applicant.sex) return 'Select a sex as it appears on legal documents.'
     if (applicant.phone.replace(/\D/g, '').length !== 10) return 'Enter a 10-digit phone number.'
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(applicant.email.trim())) return 'Enter a valid email address.'
+    if (!applicant.state) return 'Select your state of residence.'
+    const available =
+      config?.availableStates.some((s) => s.code === applicant.state) ?? false
+    if (!available) {
+      return 'ACA enrollment is currently unavailable in the selected state.'
+    }
     if (!applicant.address.trim() || !applicant.city.trim() || applicant.zip.length !== 5)
       return 'Complete your residential address (street, city, 5-digit ZIP).'
     return null
@@ -239,30 +307,12 @@ export function AcaEnrollment() {
     <>
       <SiteHeader />
       <main className="bg-[#FAFCFB]">
-        {/* Hero band */}
-        <section className="bg-[#0F3D2E] px-4 py-12 sm:px-6 sm:py-16">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="mb-2 font-sans text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A53E]">
-              — ACA Enrollment
-            </p>
-            <h1
-              className="mb-3 font-medium leading-[1.12] text-[#FAFCFB]"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 'clamp(1.9rem,5vw,3rem)' }}
-            >
-              Individual &amp; Family Marketplace Enrollment
-            </h1>
-            <p className="mx-auto max-w-2xl font-sans text-[0.9375rem] leading-[1.65] text-[#FAFCFB]/85">
-              Apply for ACA-style individual and family medical coverage. We&apos;ll confirm your
-              enrollment period, review income for potential savings, and collect the details a
-              carrier needs — with clear disclosures before you begin.
-            </p>
-          </div>
-        </section>
-
-        <section className="px-4 py-10 sm:px-6">
+        <section className="px-4 py-10 sm:px-6 sm:py-12">
           <div className="mx-auto max-w-3xl">
             {done ? (
               <SuccessCard id={done} />
+            ) : configLoading ? (
+              <p className="font-sans text-[0.9375rem] text-[#55655D]">Loading enrollment options…</p>
             ) : (
               <>
                 {/* Progress */}
@@ -294,6 +344,9 @@ export function AcaEnrollment() {
                       setSepAttested={(v) => { setSepAttested(v); setError(null) }}
                       disclosuresAccepted={disclosuresAccepted}
                       setDisclosuresAccepted={(v) => { setDisclosuresAccepted(v); setError(null) }}
+                      openEnrollmentActive={Boolean(config?.openEnrollmentActive)}
+                      specialEnrollmentEnabled={Boolean(config?.specialEnrollmentEnabled)}
+                      anyEnrollmentPathOpen={Boolean(config?.anyEnrollmentPathOpen)}
                     />
                   )}
 
@@ -340,7 +393,20 @@ export function AcaEnrollment() {
                         </Field>
                         <Field label="State" className="sm:col-span-1">
                           <select name="state" value={applicant.state} onChange={setApplicantField} className={fieldClass}>
-                            {US_STATES.map((s) => <option key={s}>{s}</option>)}
+                            <option value="">Select…</option>
+                            {(config?.states?.length
+                              ? config.states
+                              : US_STATES.map((code) => ({ code, name: code, available: false }))
+                            ).map((s) => (
+                              <option
+                                key={s.code}
+                                value={s.code}
+                                disabled={!s.available}
+                              >
+                                {s.code}
+                                {s.available ? '' : ' (unavailable)'}
+                              </option>
+                            ))}
                           </select>
                         </Field>
                         <Field label="ZIP" className="sm:col-span-1">
@@ -509,7 +575,6 @@ export function AcaEnrollment() {
           </div>
         </section>
       </main>
-      <Footer />
     </>
   )
 }
@@ -555,6 +620,9 @@ type DeclProps = {
   setSepAttested: (v: boolean) => void
   disclosuresAccepted: boolean
   setDisclosuresAccepted: (v: boolean) => void
+  openEnrollmentActive: boolean
+  specialEnrollmentEnabled: boolean
+  anyEnrollmentPathOpen: boolean
 }
 
 function DeclarationsStep(p: DeclProps) {
@@ -568,32 +636,64 @@ function DeclarationsStep(p: DeclProps) {
         disclosures below to continue.
       </p>
 
-      {/* Enrollment period */}
+      {!p.anyEnrollmentPathOpen ? (
+        <div className="mb-5 rounded-[12px] border border-[#B42318]/20 bg-[#B42318]/[0.06] px-4 py-3 font-sans text-[0.875rem] leading-[1.55] text-[#B42318]">
+          ACA enrollment is not currently open. Neither Open Enrollment nor Special Enrollment is accepting new
+          applications right now. Please check back later or contact Member Services.
+        </div>
+      ) : null}
+
       <p className="mb-2 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
         Enrollment period
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {([
-          { id: 'open', title: 'Open Enrollment', body: 'The annual window when anyone can enroll or change plans.' },
-          { id: 'sep', title: 'Special Enrollment Period', body: 'You had a qualifying life event that opens a 60-day window.' },
-        ] as const).map((o) => (
+        {(
+          [
+            {
+              id: 'open' as const,
+              title: 'Open Enrollment',
+              body: 'The annual window when anyone can enroll or change plans.',
+              active: p.openEnrollmentActive,
+              unavailable: 'Open Enrollment is not active at this time.',
+            },
+            {
+              id: 'sep' as const,
+              title: 'Special Enrollment Period',
+              body: 'You had a qualifying life event that opens a 60-day window.',
+              active: p.specialEnrollmentEnabled,
+              unavailable: 'Special Enrollment applications are not being accepted at this time.',
+            },
+          ] as const
+        ).map((o) => (
           <button
             key={o.id}
             type="button"
-            onClick={() => p.setEnrollmentPeriod(o.id)}
+            disabled={!o.active}
+            onClick={() => {
+              if (!o.active) return
+              p.setEnrollmentPeriod(o.id)
+            }}
             className={`rounded-[14px] border p-4 text-left transition ${
-              p.enrollmentPeriod === o.id ? 'border-[#0F3D2E] bg-[#0F3D2E] text-[#FAFCFB]' : 'border-[#14432A]/12 bg-white text-[#14432A] hover:border-[#14432A]/35'
+              !o.active
+                ? 'cursor-not-allowed border-[#14432A]/10 bg-[#F4F1EC] text-[#55655D]/70 opacity-80'
+                : p.enrollmentPeriod === o.id
+                  ? 'border-[#0F3D2E] bg-[#0F3D2E] text-[#FAFCFB]'
+                  : 'border-[#14432A]/12 bg-white text-[#14432A] hover:border-[#14432A]/35'
             }`}
           >
             <p className="m-0 font-sans text-[0.9375rem] font-semibold">{o.title}</p>
-            <p className={`mb-0 mt-1 font-sans text-[0.8125rem] leading-[1.5] ${p.enrollmentPeriod === o.id ? 'text-[#FAFCFB]/75' : 'text-[#55655D]'}`}>
-              {o.body}
+            <p
+              className={`mb-0 mt-1 font-sans text-[0.8125rem] leading-[1.5] ${
+                p.enrollmentPeriod === o.id && o.active ? 'text-[#FAFCFB]/75' : 'text-[#55655D]'
+              }`}
+            >
+              {o.active ? o.body : o.unavailable}
             </p>
           </button>
         ))}
       </div>
 
-      {p.enrollmentPeriod === 'sep' && (
+      {p.enrollmentPeriod === 'sep' && p.specialEnrollmentEnabled && (
         <div className="mt-4 rounded-[12px] border border-[#14432A]/12 bg-[#FAFCFB] p-4">
           <p className="m-0 mb-3 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
             Special Enrollment Period declaration
@@ -619,7 +719,6 @@ function DeclarationsStep(p: DeclProps) {
         </div>
       )}
 
-      {/* Disclosures */}
       <p className="mb-2 mt-6 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
         Enrollment disclosures
       </p>

@@ -1,6 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AcaEnrollmentFlagsPanel,
+  AcaStateLicensingPanel,
+} from '@/components/admin/aca-flags-panels'
 
 type Application = {
   id: string
@@ -80,7 +84,15 @@ type CareerListingRow = {
   published: boolean
 }
 
-type TabId = 'applications' | 'aca' | 'enrollments' | 'careers' | 'job-board' | 'ledger'
+type TabId =
+  | 'applications'
+  | 'aca'
+  | 'enrollments'
+  | 'careers'
+  | 'job-board'
+  | 'aca-flags'
+  | 'state-licensing'
+  | 'ledger'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'applications', label: 'Applications' },
@@ -88,6 +100,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'enrollments', label: 'Enrollments' },
   { id: 'careers', label: 'Career Apps' },
   { id: 'job-board', label: 'Careers Page' },
+  { id: 'aca-flags', label: 'ACA Flags' },
+  { id: 'state-licensing', label: 'State Licensing' },
   { id: 'ledger', label: 'Hyperledger Logs' },
 ]
 
@@ -171,6 +185,31 @@ export function AdminDashboard({
   const [applications, setApplications] = useState<Application[]>([])
   const [careers, setCareers] = useState<Career[]>([])
   const [listings, setListings] = useState<CareerListingRow[]>([])
+  const [acaFlags, setAcaFlags] = useState<
+    {
+      id: string
+      key: string
+      name: string
+      description: string
+      enabled: boolean
+      start_date: string | null
+      end_date: string | null
+      updated_at: string
+      active: boolean
+    }[]
+  >([])
+  const [acaStates, setAcaStates] = useState<
+    {
+      id: string
+      state_code: string
+      state_name: string
+      enabled: boolean
+      licensed: boolean
+      display_order: number
+      updated_at: string
+      status: string
+    }[]
+  >([])
   const [ledger, setLedger] = useState<LedgerLog[]>([])
   const [ledgerNote, setLedgerNote] = useState<string | null>(null)
 
@@ -182,12 +221,15 @@ export function AdminDashboard({
     setLoading(true)
     setError(null)
     try {
-      const [appsRes, careersRes, listingsRes, ledgerRes] = await Promise.all([
-        fetch('/api/admin/applications', { cache: 'no-store' }),
-        fetch('/api/admin/careers', { cache: 'no-store' }),
-        fetch('/api/admin/career-listings', { cache: 'no-store' }),
-        fetch('/api/admin/ledger-logs', { cache: 'no-store' }),
-      ])
+      const [appsRes, careersRes, listingsRes, flagsRes, statesRes, ledgerRes] =
+        await Promise.all([
+          fetch('/api/admin/applications', { cache: 'no-store' }),
+          fetch('/api/admin/careers', { cache: 'no-store' }),
+          fetch('/api/admin/career-listings', { cache: 'no-store' }),
+          fetch('/api/admin/aca-flags', { cache: 'no-store' }),
+          fetch('/api/admin/aca-states', { cache: 'no-store' }),
+          fetch('/api/admin/ledger-logs', { cache: 'no-store' }),
+        ])
 
       if (appsRes.status === 403 || careersRes.status === 403) {
         setError('Your account is not authorized for admin access.')
@@ -198,11 +240,15 @@ export function AdminDashboard({
       const appsData = await appsRes.json().catch(() => ({}))
       const careersData = await careersRes.json().catch(() => ({}))
       const listingsData = await listingsRes.json().catch(() => ({}))
+      const flagsData = await flagsRes.json().catch(() => ({}))
+      const statesData = await statesRes.json().catch(() => ({}))
       const ledgerData = await ledgerRes.json().catch(() => ({}))
 
       setApplications(appsData?.applications ?? [])
       setCareers(careersData?.careers ?? [])
       setListings(listingsData?.listings ?? [])
+      setAcaFlags(flagsData?.flags ?? [])
+      setAcaStates(statesData?.states ?? [])
       setLedger(ledgerData?.logs ?? [])
       setLedgerNote(
         ledgerData?.comingSoon
@@ -384,6 +430,20 @@ export function AdminDashboard({
               <JobBoardEditor
                 rows={listings}
                 onChange={setListings}
+                onFlash={setFlash}
+              />
+            )}
+            {tab === 'aca-flags' && (
+              <AcaEnrollmentFlagsPanel
+                flags={acaFlags}
+                onChange={setAcaFlags}
+                onFlash={setFlash}
+              />
+            )}
+            {tab === 'state-licensing' && (
+              <AcaStateLicensingPanel
+                states={acaStates}
+                onChange={setAcaStates}
                 onFlash={setFlash}
               />
             )}

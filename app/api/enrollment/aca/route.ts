@@ -3,19 +3,18 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { assertRateLimit, jsonError } from '@/lib/supabase/auth-helpers'
 import { acaEnrollmentSchema, formatZodError } from '@/lib/validation/member'
+import {
+  isACAOpenEnrollment,
+  isACASpecialEnrollmentEnabled,
+} from '@/lib/aca/enrollment-flags'
+import { getAcaStateFlag, isStateAvailable } from '@/lib/aca/state-flags'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /**
- * POST — public ACA (marketplace) enrollment submission.
- *
- * Opened from the homepage hero "Enrollment" button, so the applicant may not
- * have an account yet. We attach the signed-in user's id when present, then
- * write with the service-role client (user_id is nullable). The submission lands
- * in `insurance_applications` tagged plan_type='ACA' / source='enrollment' and
- * shows up in the admin portal's ACA tab. Rich detail (SEP declaration, income,
- * household, dependents, signature) is preserved as JSON in `notes`.
+ * POST — public ACA enrollment submission.
+ * Backend enforces enrollment-period flags and state availability.
  */
 export async function POST(req: NextRequest) {
   const limited = assertRateLimit(
@@ -37,7 +36,40 @@ export async function POST(req: NextRequest) {
   }
   const row = parsed.data
 
-  // Best-effort: link to the signed-in member if there is a session.
+  // --- Enrollment period flags (source of truth) ---
+  if (row.enrollment_period === 'open') {
+    const oepActive = await isACAOpenEnrollment()
+    if (!oepActive) {
+      return jsonError(
+        'Open Enrollment is not currently active. You cannot submit an Open Enrollment application at this time.',
+        403,
+      )
+    }
+  } else if (row.enrollment_period === 'sep') {
+    const sepEnabled = await isACASpecialEnrollmentEnabled()
+    if (!sepEnabled) {
+      return jsonError(
+        'Special Enrollment Period applications are not currently accepted.',
+        403,
+      )
+    }
+    if (!row.sep_qualifying_event || !row.sep_event_date || !row.sep_attested) {
+      return jsonError(
+        'A valid Special Enrollment Period qualifying event, event date, and attestation are required.',
+        400,
+      )
+    }
+  }
+
+  // --- State availability (source of truth) ---
+  const stateRow = await getAcaStateFlag(row.state)
+  if (!stateRow) {
+    return jsonError('ACA enrollment is currently unavailable in the selected state.', 403)
+  }
+  if (!(await isStateAvailable(row.state))) {
+    return jsonError('ACA enrollment is currently unavailable in the selected state.', 403)
+  }
+
   let userId: string | null = null
   try {
     const supabase = createClient()
@@ -49,7 +81,6 @@ export async function POST(req: NextRequest) {
     userId = null
   }
 
-  // Everything the flow collected, minus the SSN which we mask before storing.
   const maskedSsn = `***-**-${row.ssn.slice(-4)}`
   const detail = {
     submitted_at: new Date().toISOString(),
@@ -81,6 +112,11 @@ export async function POST(req: NextRequest) {
     disclosures_accepted: row.disclosures_accepted,
     e_signature: row.signature,
     ssn_masked: maskedSsn,
+    state_gate: {
+      state_code: stateRow.state_code,
+      licensed: stateRow.licensed,
+      enabled: stateRow.enabled,
+    },
   }
 
   const supabase = createServiceClient()
