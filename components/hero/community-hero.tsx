@@ -98,7 +98,7 @@ export function CommunityHero() {
                   Centuries Mutual
                 </p>
                 <h1
-                  className="mb-3 max-w-md font-medium tracking-tight text-[#0F3D2E]"
+                  className="mb-3 max-w-md text-center font-medium tracking-tight text-[#0F3D2E] mx-auto"
                   style={{
                     fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif',
                     fontSize: 'clamp(1.55rem, 5.5vw, 2.35rem)',
@@ -108,7 +108,7 @@ export function CommunityHero() {
                   Your Community Brokerage
                 </h1>
                 <h2
-                  className="mb-3 font-medium tracking-tight text-[#0F3D2E]"
+                  className="mb-3 text-center font-medium tracking-tight text-[#0F3D2E]"
                   style={{
                     fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif',
                     fontSize: 'clamp(1.05rem, 3.4vw, 1.35rem)',
