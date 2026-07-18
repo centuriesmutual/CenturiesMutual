@@ -511,10 +511,6 @@ function folderFor(a: Application): FileFolderId {
   return 'other'
 }
 
-function enrollmentActiveLabel(status: string): 'Active' | 'Inactive' {
-  return ENROLLED_STATUSES.has(status) ? 'Active' : 'Inactive'
-}
-
 function enrollmentBadge(status: string) {
   const active = ENROLLED_STATUSES.has(status)
   return (
