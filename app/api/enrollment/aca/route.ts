@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
     applicant: {
       middle_initial: row.middle_initial || null,
       sex: row.sex,
+      ssn: row.ssn,
       ssn_last4: row.ssn.slice(-4),
       apt: row.apt || null,
       county: row.county || null,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, RefreshCw, LogOut, SlidersHorizontal } from 'lucide-react'
+import { Settings, RefreshCw, LogOut, SlidersHorizontal, Phone, PhoneOff, Mic, MicOff } from 'lucide-react'
 import {
   AcaEnrollmentFlagsPanel,
   AcaStateLicensingPanel,
@@ -93,7 +93,7 @@ type AcaState = {
   status: string
 }
 
-type WorkspaceId = 'overview' | 'files' | 'employees' | 'intelligence' | 'operations' | 'ledger'
+type WorkspaceId = 'overview' | 'clients' | 'leads' | 'files' | 'employees' | 'intelligence' | 'operations' | 'ledger'
 type FileFolderId = 'all' | 'aca' | 'medicare' | 'enrolled' | 'other'
 type WorkforceView = 'directory' | 'hiring' | 'job-board'
 
@@ -140,8 +140,10 @@ const EMPTY_LISTING = {
 }
 
 const NAV_TABS: { id: Exclude<WorkspaceId, 'operations'>; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'files', label: 'Clients' },
+  { id: 'overview', label: 'Home' },
+  { id: 'clients', label: 'Clients' },
+  { id: 'leads', label: 'Leads' },
+  { id: 'files', label: 'Applications' },
   { id: 'employees', label: 'Workforce' },
   { id: 'intelligence', label: 'Intelligence' },
   { id: 'ledger', label: 'Ledger' },
@@ -187,6 +189,13 @@ function fmtShort(iso?: string | null) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+type MicroLedgerEntry = {
+  at: string
+  actor: string
+  action: string
+  detail?: string
+}
+
 function parseEnrollmentNotes(notes: string | null | undefined) {
   if (!notes) return null
   try {
@@ -200,14 +209,284 @@ function parseEnrollmentNotes(notes: string | null | undefined) {
         current_coverage?: string
       }
       sep?: { qualifying_event?: string | null; event_date?: string | null }
-      applicant?: { ssn_last4?: string; sex?: string; tobacco?: string }
+      applicant?: {
+        ssn?: string
+        ssn_last4?: string
+        sex?: string
+        tobacco?: string
+      }
       dependents?: unknown[]
+      directory_notes?: string
+      agent_notes?: string
+      directory_notes_history?: { at: string; text: string }[]
+      micro_ledger?: MicroLedgerEntry[]
+      producer_id?: string
+      agent_id?: string
+      lead_id?: string
+      marketing_id?: string
+      coverage_start?: string
+      plan_type?: string
+      ssn_masked?: string
     }
     if (!parsed || typeof parsed !== 'object') return null
     return parsed
   } catch {
     return null
   }
+}
+
+function formatSsnDigits(digits: string) {
+  const d = digits.replace(/\D/g, '').slice(0, 9)
+  if (d.length !== 9) return d
+  return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`
+}
+
+function getFullSsn(notes: string | null | undefined) {
+  const parsed = parseEnrollmentNotes(notes)
+  const raw = parsed?.applicant?.ssn || ''
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 9) return formatSsnDigits(digits)
+  if (parsed?.applicant?.ssn_last4) {
+    return `***-**-${parsed.applicant.ssn_last4}`
+  }
+  if (parsed?.ssn_masked) return parsed.ssn_masked
+  return ''
+}
+
+function getDirectoryNotes(notes: string | null | undefined) {
+  const parsed = parseEnrollmentNotes(notes)
+  if (parsed?.directory_notes) return parsed.directory_notes
+  if (parsed?.agent_notes) return parsed.agent_notes
+  if (notes && !notes.trim().startsWith('{')) return notes
+  return ''
+}
+
+function getAgentOfRecord(notes: string | null | undefined) {
+  const parsed = parseEnrollmentNotes(notes)
+  return (
+    parsed?.agent_id ||
+    parsed?.producer_id ||
+    parsed?.lead_id ||
+    parsed?.marketing_id ||
+    ''
+  )
+}
+
+function getNotesHistory(notes: string | null | undefined): { at: string; text: string }[] {
+  const parsed = parseEnrollmentNotes(notes)
+  if (Array.isArray(parsed?.directory_notes_history)) {
+    return parsed.directory_notes_history.filter(
+      (h): h is { at: string; text: string } =>
+        Boolean(h && typeof h.at === 'string' && typeof h.text === 'string'),
+    )
+  }
+  return []
+}
+
+function getMicroLedger(notes: string | null | undefined): MicroLedgerEntry[] {
+  const parsed = parseEnrollmentNotes(notes)
+  if (!Array.isArray(parsed?.micro_ledger)) return []
+  return parsed.micro_ledger.filter(
+    (e): e is MicroLedgerEntry =>
+      Boolean(e && typeof e.at === 'string' && typeof e.action === 'string'),
+  )
+}
+
+function formatMicroLedgerLine(e: MicroLedgerEntry, opts?: { shortDate?: boolean }) {
+  const when = opts?.shortDate ? fmtShort(e.at) : fmtDate(e.at)
+  const action = e.action.replace(/_/g, ' ').toLowerCase()
+  return [when, action, e.actor || null, e.detail || null].filter(Boolean).join(' · ')
+}
+
+const MICRO_LEDGER_PAGE_SIZE = 8
+
+function MicroLedgerModal({
+  entries,
+  title,
+  onClose,
+}: {
+  entries: MicroLedgerEntry[]
+  title?: string
+  onClose: () => void
+}) {
+  const [page, setPage] = useState(0)
+  const totalPages = Math.max(1, Math.ceil(entries.length / MICRO_LEDGER_PAGE_SIZE))
+
+  useEffect(() => {
+    setPage(0)
+  }, [entries])
+
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1))
+  }, [page, totalPages])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') setPage((p) => Math.max(0, p - 1))
+      if (e.key === 'ArrowRight') setPage((p) => Math.min(totalPages - 1, p + 1))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, totalPages])
+
+  const pageEntries = entries.slice(
+    page * MICRO_LEDGER_PAGE_SIZE,
+    page * MICRO_LEDGER_PAGE_SIZE + MICRO_LEDGER_PAGE_SIZE,
+  )
+
+  return (
+    <div
+      className="fixed inset-0 z-[65] flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="micro-ledger-title"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[min(88vh,560px)] w-full max-w-lg flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3">
+          <div>
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Activity
+            </p>
+            <h2
+              id="micro-ledger-title"
+              className="m-0 mt-0.5 font-medium text-[#0F3D2E]"
+              style={{ ...displayFont, fontSize: '1.15rem' }}
+            >
+              Micro ledger
+            </h2>
+            {title ? (
+              <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#55655D]">{title}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[10px] border-0 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] font-semibold text-[#55655D] transition hover:bg-[#0F3D2E]/[0.06] hover:text-[#0F3D2E]"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          {entries.length === 0 ? (
+            <p className="m-0 font-sans text-[0.8125rem] text-[#55655D]">No activity recorded.</p>
+          ) : (
+            <ul className="m-0 list-none space-y-2 p-0">
+              {pageEntries.map((e, i) => (
+                <li
+                  key={`${e.at}-${e.action}-${page}-${i}`}
+                  className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-3 py-2.5"
+                >
+                  <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">{fmtDate(e.at)}</p>
+                  <p className="m-0 mt-0.5 font-sans text-[0.8125rem] font-semibold capitalize text-[#0F3D2E]">
+                    {e.action.replace(/_/g, ' ')}
+                  </p>
+                  {e.actor ? (
+                    <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#55655D]">{e.actor}</p>
+                  ) : null}
+                  {e.detail ? (
+                    <p className="m-0 mt-0.5 break-words font-sans text-[0.75rem] text-[#55655D]">
+                      {e.detail}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[#0F3D2E]/10 px-4 py-2.5">
+          <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">
+            {entries.length === 0
+              ? '0 entries'
+              : `${page * MICRO_LEDGER_PAGE_SIZE + 1}–${Math.min(
+                  (page + 1) * MICRO_LEDGER_PAGE_SIZE,
+                  entries.length,
+                )} of ${entries.length}`}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={page <= 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              className="rounded-[8px] border-0 bg-[#E8DFD6] px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#0F3D2E] transition hover:bg-[#E0D6CA] disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="min-w-[3.5rem] text-center font-sans text-[0.6875rem] font-semibold text-[#0F3D2E]">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              className="rounded-[8px] border-0 bg-[#E8DFD6] px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#0F3D2E] transition hover:bg-[#E0D6CA] disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ensureNotesObject(existing: string | null | undefined): Record<string, unknown> {
+  try {
+    if (existing?.trim().startsWith('{')) {
+      const parsed = JSON.parse(existing) as Record<string, unknown>
+      if (parsed && typeof parsed === 'object') return { ...parsed }
+    }
+  } catch {
+    /* plain */
+  }
+  if (existing?.trim()) return { prior_notes: existing }
+  return {}
+}
+
+function withMicroLedger(
+  existing: string | null | undefined,
+  entry: MicroLedgerEntry,
+): string {
+  const parsed = ensureNotesObject(existing)
+  const ledger = Array.isArray(parsed.micro_ledger)
+    ? [...(parsed.micro_ledger as MicroLedgerEntry[])]
+    : []
+  ledger.unshift(entry)
+  parsed.micro_ledger = ledger.slice(0, 200)
+  return JSON.stringify(parsed)
+}
+
+function withDirectoryNotes(existing: string | null | undefined, directoryNotes: string) {
+  const trimmed = directoryNotes.trim()
+  const previous = getDirectoryNotes(existing)
+  const parsed = ensureNotesObject(existing)
+  const history = Array.isArray(parsed.directory_notes_history)
+    ? [...(parsed.directory_notes_history as { at: string; text: string }[])]
+    : []
+  if (previous && previous !== trimmed) {
+    history.unshift({ at: new Date().toISOString(), text: previous })
+  }
+  if (!trimmed) {
+    delete parsed.directory_notes
+  } else {
+    parsed.directory_notes = trimmed
+  }
+  parsed.directory_notes_history = history.slice(0, 50)
+  return JSON.stringify(parsed)
+}
+
+function normalizePhone(phone: string | null | undefined) {
+  return (phone || '').replace(/\D/g, '')
+}
+
+function normalizeEmail(email: string | null | undefined) {
+  return (email || '').trim().toLowerCase()
 }
 
 function sourceLabel(a: Application) {
@@ -217,11 +496,38 @@ function sourceLabel(a: Application) {
   return 'Untagged'
 }
 
+function lineOfBusiness(a: Application) {
+  if (isMedicareApplication(a)) return 'Medicare'
+  if (isAcaApplication(a)) return 'ACA'
+  if (a.plan_type?.trim()) return a.plan_type.trim()
+  if (a.source?.trim()) return a.source.trim()
+  return 'General'
+}
+
 function folderFor(a: Application): FileFolderId {
   if (ENROLLED_STATUSES.has(a.application_status)) return 'enrolled'
   if (isMedicareApplication(a)) return 'medicare'
   if (isAcaApplication(a)) return 'aca'
   return 'other'
+}
+
+function enrollmentActiveLabel(status: string): 'Active' | 'Inactive' {
+  return ENROLLED_STATUSES.has(status) ? 'Active' : 'Inactive'
+}
+
+function enrollmentBadge(status: string) {
+  const active = ENROLLED_STATUSES.has(status)
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.06em] ${
+        active
+          ? 'bg-[#0F3D2E] text-[#E8DFD6]'
+          : 'bg-[#0F3D2E]/10 text-[#55655D]'
+      }`}
+    >
+      {active ? 'Active' : 'Inactive'}
+    </span>
+  )
 }
 
 function statusBadge(status: string) {
@@ -250,11 +556,11 @@ function statusBadge(status: string) {
 }
 
 const cardClass =
-  'rounded-[20px] border border-[#0F3D2E]/10 bg-[#FAFCFB] p-5 shadow-[0_4px_20px_rgba(15,61,46,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(15,61,46,0.1)]'
+  'rounded-[14px] border border-[#0F3D2E]/10 bg-[#E8DFD6] p-3 shadow-[0_2px_12px_rgba(15,61,46,0.04)]'
 const selectClass =
-  'rounded-[12px] border border-[#0F3D2E]/15 bg-[#F7F3EE] px-3 py-2 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] outline-none focus:border-[#0F3D2E]'
+  'rounded-[10px] border border-[#0F3D2E]/15 bg-[#E8DFD6] px-2.5 py-1.5 font-sans text-[0.75rem] font-semibold text-[#0F3D2E] outline-none focus:border-[#0F3D2E]'
 const fieldClass =
-  'w-full rounded-[12px] border border-[#0F3D2E]/15 bg-[#F7F3EE] px-3 py-2 font-sans text-[0.875rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E]'
+  'w-full rounded-[10px] border border-[#0F3D2E]/15 bg-[#E8DFD6] px-2.5 py-1.5 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E]'
 const displayFont = { fontFamily: "'Playfair Display', Georgia, serif" } as const
 
 /* ---------------------------------------------------------------------------
@@ -489,10 +795,24 @@ export function AdminDashboard({
 
   const updateStatus = async (id: string, application_status: string) => {
     setFlash(null)
+    const app = applications.find((a) => a.id === id)
+    const prevStatus = app?.application_status
+    const notes = app
+      ? withMicroLedger(app.notes, {
+          at: new Date().toISOString(),
+          actor: email || 'admin',
+          action: 'status_changed',
+          detail: `${(prevStatus || 'unknown').replace(/_/g, ' ')} → ${application_status.replace(/_/g, ' ')}`,
+        })
+      : undefined
     const res = await fetch('/api/admin/applications', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, application_status }),
+      body: JSON.stringify({
+        id,
+        application_status,
+        ...(notes !== undefined ? { notes } : {}),
+      }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok || !data?.ok) {
@@ -500,9 +820,66 @@ export function AdminDashboard({
       return
     }
     setApplications((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, application_status } : a)),
+      prev.map((a) =>
+        a.id === id
+          ? {
+              ...a,
+              application_status,
+              notes: data.application?.notes ?? notes ?? a.notes,
+            }
+          : a,
+      ),
     )
     setFlash('Application status updated.')
+  }
+
+  const updateApplicationNotes = async (id: string, notes: string | null) => {
+    setFlash(null)
+    const res = await fetch('/api/admin/applications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, notes }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data?.ok) {
+      setFlash(data?.error || 'Could not save notes.')
+      return false
+    }
+    setApplications((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, notes: data.application?.notes ?? notes } : a)),
+    )
+    setFlash('Client notes saved.')
+    return true
+  }
+
+  const recordApplicationAudit = async (
+    id: string,
+    action: string,
+    detail?: string,
+    opts?: { silent?: boolean },
+  ) => {
+    const app = applications.find((a) => a.id === id)
+    if (!app) return false
+    const notes = withMicroLedger(app.notes, {
+      at: new Date().toISOString(),
+      actor: email || 'admin',
+      action,
+      detail,
+    })
+    const res = await fetch('/api/admin/applications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, notes }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data?.ok) {
+      if (!opts?.silent) setFlash(data?.error || 'Could not record activity.')
+      return false
+    }
+    setApplications((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, notes: data.application?.notes ?? notes } : a)),
+    )
+    return true
   }
 
   const updateCareerStatus = async (id: string, status: string) => {
@@ -522,33 +899,32 @@ export function AdminDashboard({
   }
 
   return (
-    <main className="min-h-dvh bg-[radial-gradient(ellipse_at_12%_0%,rgba(201,169,97,0.14)_0%,transparent_42%),linear-gradient(165deg,#E8DFD6_0%,#F7F3EE_48%,#EFE8DF_100%)]">
-      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
-        {/* Office-style workspace header */}
-        <div className="relative mb-10 flex flex-wrap items-end justify-between gap-4">
+    <main className="flex h-dvh flex-col overflow-hidden bg-[radial-gradient(ellipse_at_12%_0%,rgba(201,169,97,0.14)_0%,transparent_42%),linear-gradient(165deg,#E8DFD6_0%,#F7F3EE_48%,#EFE8DF_100%)]">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col px-3 py-3 sm:px-5 sm:py-4">
+        <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="m-0 font-sans text-[10px] font-semibold uppercase tracking-[0.28em] text-[#C9A961]">
+            <p className="m-0 font-sans text-[9px] font-semibold uppercase tracking-[0.24em] text-[#C9A961]">
               Centuries Mutual · Office
             </p>
             <button
               type="button"
               onClick={goHome}
-              className="m-0 mt-2 block cursor-pointer border-0 bg-transparent p-0 text-left font-medium tracking-tight text-[#0F3D2E] transition hover:text-[#245C45]"
-              style={{ ...displayFont, fontSize: 'clamp(1.85rem,3vw,2.45rem)' }}
-              title="Refresh and return to Overview"
+              className="m-0 mt-0.5 block cursor-pointer border-0 bg-transparent p-0 text-left font-medium tracking-tight text-[#0F3D2E] transition hover:text-[#245C45]"
+              style={{ ...displayFont, fontSize: 'clamp(1.25rem,2.2vw,1.65rem)' }}
+              title="Refresh and return to Home"
             >
               Administration
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => void loadAll()}
               aria-label="Refresh"
               title="Refresh"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border-0 bg-transparent text-[#0F3D2E] transition hover:-translate-y-0.5 hover:text-[#245C45]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border-0 bg-transparent text-[#0F3D2E] transition hover:text-[#245C45]"
             >
-              <RefreshCw className="h-4 w-4" strokeWidth={2.25} />
+              <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.25} />
             </button>
             <div className="relative" ref={settingsRef}>
               <button
@@ -557,9 +933,9 @@ export function AdminDashboard({
                 aria-label="Settings"
                 aria-expanded={settingsOpen}
                 title="Settings"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#0F3D2E]/18 bg-[#FAFCFB] text-[#0F3D2E] transition hover:-translate-y-0.5 hover:border-[#0F3D2E] hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border-0 bg-[#C9B396] text-[#0F3D2E] transition hover:bg-[#0F3D2E] hover:text-[#E8DFD6]"
               >
-                <Settings className="h-4 w-4" strokeWidth={2.25} />
+                <Settings className="h-3.5 w-3.5" strokeWidth={2.25} />
               </button>
               {settingsOpen ? (
                 <div className="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-[14px] border border-[#0F3D2E]/12 bg-[#FAFCFB] shadow-[0_16px_40px_rgba(15,61,46,0.16)]">
@@ -594,15 +970,10 @@ export function AdminDashboard({
               ) : null}
             </div>
           </div>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -bottom-5 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(15,61,46,0.18),transparent)]"
-          />
         </div>
 
-        {/* Workspace folder: tabs sit on the content panel */}
-        <div>
-          <nav className="relative z-10" aria-label="Office sections">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <nav className="relative z-10 shrink-0" aria-label="Office sections">
             <div className="flex items-end gap-1 px-0.5">
               {NAV_TABS.map((w) => {
                 const active = workspace === w.id
@@ -611,18 +982,18 @@ export function AdminDashboard({
                     key={w.id}
                     type="button"
                     onClick={() => setWorkspace(w.id)}
-                    className={`relative mb-[-1px] flex shrink-0 items-center gap-1.5 rounded-t-[10px] border px-4 py-2.5 font-sans text-[0.8125rem] font-semibold transition ${
+                    className={`relative mb-[-1px] flex shrink-0 items-center gap-1.5 rounded-t-[8px] border px-3 py-1.5 font-sans text-[0.75rem] font-semibold transition ${
                       active
-                        ? 'z-10 border-[#B89A78] border-b-[#FAFCFB] bg-[#FAFCFB] text-[#0F3D2E]'
+                        ? 'z-10 border-[#0F3D2E] bg-[#0F3D2E] text-[#E8DFD6]'
                         : 'z-0 border-transparent bg-[#C9B396]/55 text-[#0F3D2E]/70 hover:bg-[#C9B396]/85 hover:text-[#0F3D2E]'
                     }`}
                   >
                     {w.label}
                     {w.id === 'files' ? (
                       <span
-                        className={`inline-flex min-w-[1.15rem] items-center justify-center rounded-full px-1.5 py-0.5 font-sans text-[0.625rem] font-bold leading-none ${
+                        className={`inline-flex min-w-[1.05rem] items-center justify-center rounded-full px-1 py-0.5 font-sans text-[0.5625rem] font-bold leading-none ${
                           active
-                            ? 'bg-[#0F3D2E] text-[#FAFCFB]'
+                            ? 'bg-[#C9A961] text-[#0F3D2E]'
                             : 'bg-[#0F3D2E]/75 text-[#FAFCFB]'
                         }`}
                       >
@@ -635,20 +1006,20 @@ export function AdminDashboard({
             </div>
           </nav>
 
-          <div className="overflow-hidden rounded-b-[20px] rounded-tr-[20px] border border-[#B89A78] bg-[#FAFCFB] shadow-[0_4px_20px_rgba(15,61,46,0.05)]">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[16px] rounded-tr-[16px] border border-[#B89A78] bg-[#F7F3EE] shadow-[0_4px_20px_rgba(15,61,46,0.05)]">
             {flash ? (
-              <p className="m-0 border-b border-[#0F3D2E]/10 bg-[#E8F0EA] px-4 py-3 font-sans text-[0.875rem] text-[#0F3D2E]">
+              <p className="m-0 shrink-0 border-b border-[#0F3D2E]/10 bg-[#E8F0EA] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E]">
                 {flash}
               </p>
             ) : null}
             {error ? (
-              <p className="m-0 border-b border-[#0F3D2E]/10 bg-[#B42318]/[0.08] px-4 py-3 font-sans text-[0.875rem] text-[#B42318]">
+              <p className="m-0 shrink-0 border-b border-[#0F3D2E]/10 bg-[#B42318]/[0.08] px-3 py-2 font-sans text-[0.8125rem] text-[#B42318]">
                 {error}
               </p>
             ) : null}
             {loading ? (
-              <div className="py-16 text-center">
-                <p className="m-0 font-sans text-[0.9375rem] text-[#55655D]">Loading workspace…</p>
+              <div className="flex flex-1 items-center justify-center py-10 text-center">
+                <p className="m-0 font-sans text-[0.875rem] text-[#55655D]">Loading workspace…</p>
               </div>
             ) : (
               <AnimatePresence mode="wait">
@@ -657,11 +1028,28 @@ export function AdminDashboard({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="[&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none [&>*]:hover:translate-y-0 [&>*]:hover:shadow-none"
+                  transition={{ duration: 0.14 }}
+                  className="flex min-h-0 flex-1 flex-col overflow-hidden [&>*]:min-h-0 [&>*]:flex-1 [&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none"
                 >
                   {workspace === 'overview' && (
                     <OverviewPanel applications={applications} careers={careers} />
+                  )}
+
+                  {workspace === 'clients' && (
+                    <ClientsDirectoryPanel
+                      applications={applications}
+                      actorEmail={email}
+                      onSaveNotes={updateApplicationNotes}
+                      onAudit={recordApplicationAudit}
+                    />
+                  )}
+
+                  {workspace === 'leads' && (
+                    <LeadsSpreadsheetPanel
+                      applications={applications}
+                      onUpdateStatus={updateStatus}
+                      onAudit={recordApplicationAudit}
+                    />
                   )}
 
                   {workspace === 'files' && (
@@ -671,10 +1059,6 @@ export function AdminDashboard({
                       rows={folderRows}
                       selected={selected}
                       query={query}
-                      sales={salesStats}
-                      acaCount={acaApplications.length}
-                      medicareCount={medicareApplications.length}
-                      enrolledCount={enrollments.length}
                       onQuery={setQuery}
                       onFolder={(id) => {
                         setFolder(id)
@@ -682,11 +1066,12 @@ export function AdminDashboard({
                       }}
                       onSelect={setSelectedId}
                       onUpdateStatus={updateStatus}
+                      onAudit={recordApplicationAudit}
                     />
                   )}
 
                   {workspace === 'employees' && (
-                    <div className="p-4 sm:p-5">
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
                       <EmployeesWorkspace
                         careers={careers}
                         listings={listings}
@@ -699,13 +1084,19 @@ export function AdminDashboard({
                   )}
 
                   {workspace === 'intelligence' && (
-                    <div className="p-4 sm:p-5">
-                      <SalesMarketingPanel sales={salesStats} />
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+                      <SalesMarketingPanel
+                        sales={salesStats}
+                        counts={folderCounts}
+                        acaCount={acaApplications.length}
+                        medicareCount={medicareApplications.length}
+                        enrolledCount={enrollments.length}
+                      />
                     </div>
                   )}
 
                   {workspace === 'operations' && (
-                    <div className="space-y-4 p-4 sm:p-5">
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
                       <div className="flex flex-wrap gap-2">
                         {(
                           [
@@ -717,7 +1108,7 @@ export function AdminDashboard({
                             key={p.id}
                             type="button"
                             onClick={() => setOpsPanel(p.id)}
-                            className={`rounded-[12px] px-4 py-2 font-sans text-[0.8125rem] font-semibold transition ${
+                            className={`rounded-[10px] px-3 py-1.5 font-sans text-[0.75rem] font-semibold transition ${
                               opsPanel === p.id
                                 ? 'bg-[#0F3D2E] text-[#FAFCFB]'
                                 : 'border border-[#0F3D2E]/10 bg-[#FAFCFB] text-[#0F3D2E] hover:bg-[#0F3D2E]/[0.06]'
@@ -744,7 +1135,7 @@ export function AdminDashboard({
                   )}
 
                   {workspace === 'ledger' && (
-                    <div className="p-4 sm:p-5">
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
                       <LedgerTable rows={ledger} note={ledgerNote} />
                     </div>
                   )}
@@ -755,6 +1146,1390 @@ export function AdminDashboard({
         </div>
       </div>
     </main>
+  )
+}
+
+/* ---------------------------------------------------------------------------
+ * Clients — directory lookup
+ * ------------------------------------------------------------------------- */
+
+function DuplicateFieldMark({ message }: { message: string }) {
+  return (
+    <span className="group relative ml-1 inline-flex align-middle">
+      <span
+        className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-[#B45309] font-sans text-[0.5625rem] font-bold leading-none text-[#B45309]"
+        aria-label={message}
+      >
+        !
+      </span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-52 -translate-x-1/2 rounded-[8px] bg-[#0F3D2E] px-2.5 py-1.5 font-sans text-[0.6875rem] font-normal normal-case tracking-normal text-[#E8DFD6] opacity-0 shadow-lg transition group-hover:opacity-100">
+        {message}
+      </span>
+    </span>
+  )
+}
+
+function DirectoryHistoryModal({
+  app,
+  onClose,
+}: {
+  app: Application
+  onClose: () => void
+}) {
+  const detail = parseEnrollmentNotes(app.notes)
+  const currentNotes = getDirectoryNotes(app.notes)
+  const notesHistory = getNotesHistory(app.notes)
+  const microLedger = getMicroLedger(app.notes)
+  const agentId = getAgentOfRecord(app.notes)
+
+  const enrollmentEvents = useMemo(() => {
+    const events: { at: string; title: string; detail: string }[] = [
+      {
+        at: app.created_at,
+        title: 'Application submitted',
+        detail: `${sourceLabel(app)}${app.plan_type ? ` · ${app.plan_type}` : ''}`,
+      },
+      {
+        at: app.created_at,
+        title: `Status · ${app.application_status.replace(/_/g, ' ')}`,
+        detail: `Application ID ${app.id}`,
+      },
+    ]
+    if (agentId) {
+      events.push({
+        at: app.created_at,
+        title: 'Agent of Record',
+        detail: agentId,
+      })
+    }
+    if (detail?.enrollment_period) {
+      events.push({
+        at: app.created_at,
+        title: 'Enrollment period',
+        detail:
+          detail.enrollment_period === 'sep' ? 'Special Enrollment Period' : 'Open Enrollment',
+      })
+    }
+    if (detail?.household?.coverage_start) {
+      events.push({
+        at: detail.household.coverage_start,
+        title: 'Coverage start',
+        detail: detail.household.coverage_start,
+      })
+    }
+    if (detail?.sep?.qualifying_event) {
+      events.push({
+        at: detail.sep.event_date || app.created_at,
+        title: 'SEP qualifying event',
+        detail: `${detail.sep.qualifying_event}${
+          detail.sep.event_date ? ` · ${detail.sep.event_date}` : ''
+        }`,
+      })
+    }
+    if (typeof detail?.household?.annual_income === 'number') {
+      events.push({
+        at: app.created_at,
+        title: 'Household income recorded',
+        detail: `$${detail.household.annual_income.toLocaleString('en-US')}${
+          detail.household.size ? ` · HH ${detail.household.size}` : ''
+        }`,
+      })
+    }
+    if (Array.isArray(detail?.dependents) && detail.dependents.length > 0) {
+      events.push({
+        at: app.created_at,
+        title: 'Dependents',
+        detail: `${detail.dependents.length} dependent${detail.dependents.length === 1 ? '' : 's'}`,
+      })
+    }
+    return events
+  }, [app, agentId, detail])
+
+  const noteEntries = useMemo(() => {
+    const entries: { at: string; text: string; current?: boolean }[] = []
+    if (currentNotes.trim()) {
+      entries.push({ at: new Date().toISOString(), text: currentNotes, current: true })
+    }
+    for (const h of notesHistory) {
+      entries.push({ at: h.at, text: h.text })
+    }
+    return entries
+  }, [currentNotes, notesHistory])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="directory-history-title"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[min(88vh,640px)] w-full max-w-2xl flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3 sm:px-5">
+          <div>
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Client history
+            </p>
+            <h2
+              id="directory-history-title"
+              className="m-0 mt-0.5 font-medium text-[#0F3D2E]"
+              style={{ ...displayFont, fontSize: '1.2rem' }}
+            >
+              {app.first_name} {app.last_name}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[10px] border-0 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] font-semibold text-[#55655D] transition hover:bg-[#0F3D2E]/[0.06] hover:text-[#0F3D2E]"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+          <section>
+            <h3 className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
+              Notes history
+            </h3>
+            {noteEntries.length === 0 ? (
+              <p className="m-0 mt-2 font-sans text-[0.8125rem] text-[#55655D]">No notes recorded yet.</p>
+            ) : (
+              <ul className="m-0 mt-2 list-none space-y-2 p-0">
+                {noteEntries.map((entry, i) => (
+                  <li
+                    key={`${entry.at}-${i}`}
+                    className="rounded-[12px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-3 py-2.5"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">
+                        {entry.current ? 'Current' : fmtDate(entry.at)}
+                      </p>
+                      {entry.current ? (
+                        <span className="rounded-full bg-[#0F3D2E]/10 px-2 py-0.5 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#0F3D2E]">
+                          Latest
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="m-0 mt-1 whitespace-pre-wrap font-sans text-[0.8125rem] text-[#0F3D2E]">
+                      {entry.text}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {microLedger.length > 0 ? (
+              <div className="mt-3 border-t border-[#0F3D2E]/08 pt-3">
+                <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+                  Micro ledger
+                </p>
+                <ul className="m-0 mt-1.5 max-h-40 list-none space-y-1 overflow-y-auto p-0">
+                  {microLedger.map((e, i) => (
+                    <li
+                      key={`${e.at}-${e.action}-${i}`}
+                      className="font-sans text-[0.625rem] leading-snug text-[#55655D]"
+                    >
+                      <span className="text-[#0F3D2E]/70">{fmtDate(e.at)}</span>
+                      {' · '}
+                      <span className="lowercase">{e.action.replace(/_/g, ' ')}</span>
+                      {e.actor ? ` · ${e.actor}` : ''}
+                      {e.detail ? ` · ${e.detail}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
+
+          <section>
+            <h3 className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
+              Enrollment history
+            </h3>
+            <ul className="m-0 mt-2 list-none space-y-2 p-0">
+              {enrollmentEvents.map((ev, i) => (
+                <li
+                  key={`${ev.title}-${i}`}
+                  className="rounded-[12px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2.5"
+                >
+                  <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">{fmtDate(ev.at)}</p>
+                  <p className="m-0 mt-0.5 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
+                    {ev.title}
+                  </p>
+                  <p className="m-0 mt-0.5 break-words font-sans text-[0.75rem] text-[#55655D]">
+                    {ev.detail}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ClientsDirectoryPanel({
+  applications,
+  actorEmail,
+  onSaveNotes,
+  onAudit,
+}: {
+  applications: Application[]
+  actorEmail: string | null
+  onSaveNotes: (id: string, notes: string | null) => Promise<boolean>
+  onAudit: (
+    id: string,
+    action: string,
+    detail?: string,
+    opts?: { silent?: boolean },
+  ) => Promise<boolean>
+}) {
+  const [search, setSearch] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [ssnRevealed, setSsnRevealed] = useState(false)
+  const [callTarget, setCallTarget] = useState<SoftPhoneTarget | null>(null)
+  const [microLedgerOpen, setMicroLedgerOpen] = useState(false)
+  const lastViewedId = useRef<string | null>(null)
+
+  const matches = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return applications
+    return applications.filter((a) => {
+      const hay = [
+        a.id,
+        a.first_name,
+        a.last_name,
+        a.email,
+        a.phone,
+        a.address,
+        a.city,
+        a.state,
+        a.zip,
+        a.plan_type,
+        a.source,
+        a.application_status,
+        getAgentOfRecord(a.notes),
+        getDirectoryNotes(a.notes),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  }, [applications, search])
+
+  useEffect(() => {
+    if (selectedId && !matches.some((a) => a.id === selectedId)) {
+      setSelectedId(matches[0]?.id ?? null)
+    } else if (!selectedId && matches.length === 1) {
+      setSelectedId(matches[0].id)
+    }
+  }, [matches, selectedId])
+
+  const selected = applications.find((a) => a.id === selectedId) ?? null
+
+  useEffect(() => {
+    setNotesDraft(selected ? getDirectoryNotes(selected.notes) : '')
+    setHistoryOpen(false)
+    setSsnRevealed(false)
+    setMicroLedgerOpen(false)
+  }, [selected?.id])
+
+  useEffect(() => {
+    if (!selectedId || lastViewedId.current === selectedId) return
+    lastViewedId.current = selectedId
+    void onAudit(selectedId, 'viewed', 'Directory', { silent: true })
+  }, [selectedId, onAudit])
+
+  const detail = selected ? parseEnrollmentNotes(selected.notes) : null
+  const fullSsn = selected ? getFullSsn(selected.notes) : ''
+  const microLedger = selected ? getMicroLedger(selected.notes) : []
+
+  const duplicateEmailWarning = useMemo(() => {
+    if (!selected?.email) return null
+    const email = normalizeEmail(selected.email)
+    if (!email) return null
+    const others = applications.filter(
+      (a) => a.id !== selected.id && normalizeEmail(a.email) === email,
+    )
+    if (others.length === 0) return null
+    const names = others
+      .slice(0, 3)
+      .map((a) => `${a.first_name} ${a.last_name}`.trim())
+      .join(', ')
+    const more = others.length > 3 ? ` (+${others.length - 3} more)` : ''
+    return `Another profile is using the same email: ${names}${more}`
+  }, [applications, selected])
+
+  const duplicatePhoneWarning = useMemo(() => {
+    if (!selected?.phone) return null
+    const phone = normalizePhone(selected.phone)
+    if (phone.length < 7) return null
+    const others = applications.filter(
+      (a) => a.id !== selected.id && normalizePhone(a.phone) === phone,
+    )
+    if (others.length === 0) return null
+    const names = others
+      .slice(0, 3)
+      .map((a) => `${a.first_name} ${a.last_name}`.trim())
+      .join(', ')
+    const more = others.length > 3 ? ` (+${others.length - 3} more)` : ''
+    return `Another profile is using the same phone number: ${names}${more}`
+  }, [applications, selected])
+
+  const fieldDefs = [
+    'Application ID',
+    'Agent of Record',
+    'Enrollment',
+    'First name',
+    'Last name',
+    'Email',
+    'Date of birth',
+    'Plan type',
+    'Status',
+    'Source',
+    'Address',
+    'Coverage start',
+    'Submitted',
+  ] as const
+
+  const fields: { label: string; value: string; warning?: string | null }[] = fieldDefs.map(
+    (label) => {
+      if (!selected) return { label, value: '' }
+      switch (label) {
+        case 'Application ID':
+          return { label, value: selected.id }
+        case 'Agent of Record':
+          return { label, value: getAgentOfRecord(selected.notes) }
+        case 'Enrollment':
+          return { label, value: enrollmentActiveLabel(selected.application_status) }
+        case 'First name':
+          return { label, value: selected.first_name || '' }
+        case 'Last name':
+          return { label, value: selected.last_name || '' }
+        case 'Email':
+          return { label, value: selected.email || '', warning: duplicateEmailWarning }
+        case 'Date of birth':
+          return { label, value: selected.date_of_birth || '' }
+        case 'Plan type':
+          return { label, value: selected.plan_type || '' }
+        case 'Status':
+          return { label, value: selected.application_status.replace(/_/g, ' ') }
+        case 'Source':
+          return { label, value: sourceLabel(selected) }
+        case 'Address':
+          return {
+            label,
+            value:
+              [selected.address, selected.city, selected.state, selected.zip]
+                .filter(Boolean)
+                .join(', ') || '',
+          }
+        case 'Coverage start':
+          return { label, value: detail?.household?.coverage_start || '' }
+        case 'Submitted':
+          return { label, value: fmtDate(selected.created_at) }
+        default:
+          return { label, value: '' }
+      }
+    },
+  )
+
+  const saveNotes = async () => {
+    if (!selected) return
+    setSavingNotes(true)
+    try {
+      let notes = withDirectoryNotes(selected.notes, notesDraft)
+      notes = withMicroLedger(notes, {
+        at: new Date().toISOString(),
+        actor: actorEmail || 'admin',
+        action: 'notes_updated',
+        detail: 'Directory notes saved',
+      })
+      await onSaveNotes(selected.id, notes)
+    } finally {
+      setSavingNotes(false)
+    }
+  }
+
+  const revealSsn = () => {
+    if (!selected || ssnRevealed) return
+    setSsnRevealed(true)
+    void onAudit(selected.id, 'ssn_revealed', 'Directory', { silent: true })
+  }
+
+  const clearDirectory = () => {
+    setSearch('')
+    setSelectedId(null)
+    setNotesDraft('')
+    setPickerOpen(false)
+    setHistoryOpen(false)
+    setSsnRevealed(false)
+    setMicroLedgerOpen(false)
+  }
+
+  const emptyFieldClass =
+    'w-full rounded-[10px] border border-[#0F3D2E]/20 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none placeholder:text-[#55655D]/50'
+  const filledFieldClass =
+    'w-full cursor-default rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-2.5 py-1.5 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none'
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-[#F7F3EE] p-3 sm:p-4">
+      <div className="shrink-0">
+        <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+          Clients
+        </p>
+        <h2 className="m-0 mt-0.5 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.25rem' }}>
+          Directory
+        </h2>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.32fr)]">
+        {/* Client record — larger left column */}
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-[14px] bg-[#E8DFD6] p-3 sm:p-4">
+          <div className="mb-3 flex min-h-[1.75rem] shrink-0 flex-wrap items-center gap-2">
+            {selected ? (
+              <>
+                <h3 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+                  {selected.first_name} {selected.last_name}
+                </h3>
+                {enrollmentBadge(selected.application_status)}
+              </>
+            ) : (
+              <h3 className="m-0 font-medium text-[#55655D]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+                Client record
+              </h3>
+            )}
+          </div>
+          <div className="grid min-h-0 shrink grid-cols-1 content-start gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+            {fields.map((f) => (
+              <label key={f.label} className="block">
+                <span className="mb-1 flex items-center font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  {f.label}
+                  {f.warning ? <DuplicateFieldMark message={f.warning} /> : null}
+                </span>
+                <input
+                  readOnly
+                  value={f.value}
+                  placeholder="—"
+                  className={selected ? filledFieldClass : emptyFieldClass}
+                />
+              </label>
+            ))}
+            <div className="block">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  SSN
+                </span>
+                <button
+                  type="button"
+                  disabled={!selected || !fullSsn || ssnRevealed}
+                  onClick={revealSsn}
+                  className="rounded-[6px] border-0 bg-transparent px-1.5 py-0.5 font-sans text-[0.625rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] disabled:opacity-40"
+                >
+                  {ssnRevealed ? 'Revealed' : 'Reveal'}
+                </button>
+              </div>
+              <input
+                readOnly
+                value={selected ? fullSsn || '—' : ''}
+                placeholder="—"
+                className={`${selected ? filledFieldClass : emptyFieldClass} ${
+                  selected && fullSsn && !ssnRevealed ? 'select-none blur-[5px]' : ''
+                }`}
+              />
+            </div>
+          </div>
+          <div className="mt-3 flex min-h-0 flex-1 flex-col">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                Notes
+              </span>
+              <button
+                type="button"
+                disabled={!selected}
+                onClick={() => setHistoryOpen(true)}
+                className="rounded-[8px] border-0 bg-transparent px-2 py-0.5 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] disabled:opacity-40"
+              >
+                History
+              </button>
+            </div>
+            <textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              placeholder="Add notes about this client…"
+              disabled={!selected}
+              className={`${
+                selected ? filledFieldClass : emptyFieldClass
+              } min-h-[72px] flex-1 resize-none disabled:opacity-70`}
+            />
+            {selected && microLedger.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setMicroLedgerOpen(true)}
+                className="mt-2 w-full shrink-0 rounded-[8px] border border-[#0F3D2E]/08 bg-[#F7F3EE]/80 px-2 py-1.5 text-left transition hover:bg-[#F0EBE4]"
+                title="View full micro ledger"
+              >
+                <p className="m-0 font-sans text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
+                  Micro ledger
+                </p>
+                <p className="m-0 mt-0.5 truncate font-sans text-[0.5625rem] leading-snug text-[#55655D]">
+                  {formatMicroLedgerLine(microLedger[0], { shortDate: true })}
+                </p>
+                {microLedger.length > 1 ? (
+                  <p className="m-0 mt-0.5 font-sans text-[0.5rem] text-[#0F3D2E]/55">
+                    +{microLedger.length - 1} earlier · click to view all
+                  </p>
+                ) : null}
+              </button>
+            ) : null}
+            <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 max-w-[14rem] flex-1 items-center gap-1.5 sm:max-w-[16rem]">
+                <button
+                  type="button"
+                  disabled={!selected?.phone}
+                  onClick={() => {
+                    if (!selected?.phone) return
+                    setCallTarget({
+                      applicationId: selected.id,
+                      name: `${selected.first_name} ${selected.last_name}`.trim(),
+                      phone: selected.phone,
+                      context: 'Clients',
+                    })
+                  }}
+                  title={selected?.phone ? `Call ${selected.phone}` : 'No phone on file'}
+                  className="inline-flex shrink-0 items-center justify-center border-0 bg-transparent p-0 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-35"
+                >
+                  <Phone className="h-3.5 w-3.5" strokeWidth={2.25} />
+                </button>
+                {duplicatePhoneWarning ? (
+                  <DuplicateFieldMark message={duplicatePhoneWarning} />
+                ) : null}
+                <input
+                  readOnly
+                  value={selected?.phone || ''}
+                  placeholder="—"
+                  className={`${selected ? filledFieldClass : emptyFieldClass} min-w-0 flex-1`}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={
+                  !selected || savingNotes || notesDraft === getDirectoryNotes(selected.notes)
+                }
+                onClick={() => void saveNotes()}
+                className="shrink-0 rounded-[10px] bg-[#0F3D2E] px-4 py-2 font-sans text-[0.75rem] font-semibold text-[#E8DFD6] transition hover:bg-[#0A2E22] disabled:opacity-50"
+              >
+                {savingNotes ? 'Saving…' : 'Save notes'}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Search card — narrower right column */}
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[14px] bg-[#E8DFD6] p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
+              Search
+            </p>
+            <button
+              type="button"
+              onClick={clearDirectory}
+              className="rounded-[8px] border-0 bg-transparent px-2 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06]"
+            >
+              Clear
+            </button>
+          </div>
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPickerOpen(true)
+            }}
+            onFocus={() => setPickerOpen(true)}
+            placeholder="Name, email, phone, state…"
+            className={`${fieldClass} w-full shrink-0`}
+            autoFocus
+          />
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
+            {pickerOpen && search.trim() ? (
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {matches.length === 0 ? (
+                  <li className="rounded-[12px] bg-white px-3 py-2.5 font-sans text-[0.8125rem] text-[#55655D]">
+                    No clients found.
+                  </li>
+                ) : (
+                  matches.slice(0, 12).map((a) => (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSelectedId(a.id)
+                          setSearch(`${a.first_name} ${a.last_name}`)
+                          setPickerOpen(false)
+                        }}
+                        className={`flex w-full flex-col rounded-[12px] border-0 px-3 py-2.5 text-left shadow-none transition ${
+                          selectedId === a.id
+                            ? 'bg-[#0F3D2E] text-[#E8DFD6]'
+                            : 'bg-white text-[#0F3D2E] hover:bg-[#FAFCFB]'
+                        }`}
+                      >
+                        <span
+                          className={`font-sans text-[0.8125rem] font-semibold ${
+                            selectedId === a.id ? 'text-[#E8DFD6]' : 'text-[#0F3D2E]'
+                          }`}
+                        >
+                          {a.first_name} {a.last_name}
+                        </span>
+                        <span
+                          className={`truncate font-sans text-[0.6875rem] ${
+                            selectedId === a.id ? 'text-[#E8DFD6]/75' : 'text-[#55655D]'
+                          }`}
+                        >
+                          {a.email}
+                          {a.state ? ` · ${a.state}` : ''}
+                        </span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            ) : (
+              <p className="m-0 px-0.5 font-sans text-[0.75rem] text-[#55655D]">
+                Type to find a client. Results stay in this panel so the record stays visible.
+              </p>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      {historyOpen && selected ? (
+        <DirectoryHistoryModal app={selected} onClose={() => setHistoryOpen(false)} />
+      ) : null}
+
+      {microLedgerOpen && selected ? (
+        <MicroLedgerModal
+          entries={microLedger}
+          title={`${selected.first_name} ${selected.last_name}`}
+          onClose={() => setMicroLedgerOpen(false)}
+        />
+      ) : null}
+
+      <AnimatePresence>
+        {callTarget ? (
+          <SoftPhoneDialer
+            key={callTarget.applicationId}
+            target={callTarget}
+            onClose={() => setCallTarget(null)}
+            onComplete={async (payload) => {
+              await onAudit(
+                callTarget.applicationId,
+                'call_disposition',
+                `${payload.dispositionGroup}: ${payload.dispositionLabel}${
+                  payload.notes ? ` · ${payload.notes}` : ''
+                } · ${payload.durationSec}s`,
+                { silent: true },
+              )
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------------------
+ * Soft phone — simulated dialer (Clients + Leads)
+ * ------------------------------------------------------------------------- */
+
+const DISPOSITION_OPTIONS = [
+  { value: 'interested_quote', label: 'Interested – Send Quote' },
+  { value: 'interested_transfer', label: 'Interested – Transferred to Licensed Agent' },
+  { value: 'not_interested', label: 'Not Interested' },
+  { value: 'do_not_call', label: 'Do Not Call' },
+  { value: 'callback', label: 'Call Back Later' },
+  { value: 'voicemail', label: 'Left Voicemail' },
+  { value: 'no_answer', label: 'No Answer' },
+  { value: 'wrong_number', label: 'Disconnected / Wrong Number' },
+  { value: 'qualified_docs', label: 'Qualified – Awaiting Documents' },
+  { value: 'qualified_submitted', label: 'Qualified – Application Submitted' },
+  { value: 'not_qualified_age', label: 'Not Qualified – Age' },
+  { value: 'not_qualified_income', label: 'Not Qualified – Income' },
+  { value: 'has_insurance', label: 'Already Has Insurance' },
+  { value: 'out_of_area', label: 'Out of Service Area' },
+  { value: 'sale', label: 'Sale' },
+  { value: 'sale_bound', label: 'Sale – Policy Bound' },
+  { value: 'sale_pending', label: 'Sale – Payment Pending' },
+  { value: 'sale_followup', label: 'Sale – Follow-up Required' },
+  { value: 'no_sale_declined', label: 'No Sale – Declined' },
+  { value: 'no_sale_competitor', label: 'No Sale – Lost to Competitor' },
+] as const
+
+type SoftPhoneTarget = {
+  applicationId: string
+  name: string
+  phone: string
+  context: string
+}
+
+function formatDialDisplay(digits: string) {
+  const d = digits.replace(/\D/g, '').slice(0, 15)
+  if (d.length <= 3) return d
+  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`
+  if (d.length <= 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+  return `+${d.slice(0, d.length - 10)} (${d.slice(-10, -7)}) ${d.slice(-7, -4)}-${d.slice(-4)}`
+}
+
+function SoftPhoneDialer({
+  target,
+  onClose,
+  onComplete,
+}: {
+  target: SoftPhoneTarget
+  onClose: () => void
+  onComplete: (payload: {
+    dispositionGroup: string
+    disposition: string
+    dispositionLabel: string
+    notes: string
+    durationSec: number
+  }) => void | Promise<void>
+}) {
+  const seedDigits = normalizePhone(target.phone)
+  const [phase, setPhase] = useState<'dialing' | 'ringing' | 'connected' | 'ended'>('dialing')
+  const [digits, setDigits] = useState(seedDigits)
+  const [muted, setMuted] = useState(false)
+  const [showPad, setShowPad] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+  const [disposition, setDisposition] = useState('')
+  const [dispNotes, setDispNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const startedAt = useRef<number | null>(null)
+
+  useEffect(() => {
+    const t1 = window.setTimeout(() => setPhase('ringing'), 700)
+    const t2 = window.setTimeout(() => {
+      setPhase('connected')
+      startedAt.current = Date.now()
+    }, 2800)
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (phase !== 'connected') return
+    const id = window.setInterval(() => {
+      if (startedAt.current) {
+        setElapsed(Math.floor((Date.now() - startedAt.current) / 1000))
+      }
+    }, 250)
+    return () => window.clearInterval(id)
+  }, [phase])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && phase === 'ended') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, phase])
+
+  const statusLabel =
+    phase === 'dialing'
+      ? 'calling…'
+      : phase === 'ringing'
+        ? 'ringing…'
+        : phase === 'connected'
+          ? `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`
+          : 'call ended'
+
+  const padKeys = [
+    { d: '1', sub: '' },
+    { d: '2', sub: 'ABC' },
+    { d: '3', sub: 'DEF' },
+    { d: '4', sub: 'GHI' },
+    { d: '5', sub: 'JKL' },
+    { d: '6', sub: 'MNO' },
+    { d: '7', sub: 'PQRS' },
+    { d: '8', sub: 'TUV' },
+    { d: '9', sub: 'WXYZ' },
+    { d: '*', sub: '' },
+    { d: '0', sub: '+' },
+    { d: '#', sub: '' },
+  ] as const
+
+  const endCall = () => setPhase('ended')
+
+  const saveDisposition = async () => {
+    if (!disposition) return
+    const opt = DISPOSITION_OPTIONS.find((o) => o.value === disposition)
+    setSaving(true)
+    try {
+      await onComplete({
+        dispositionGroup: 'Disposition',
+        disposition,
+        dispositionLabel: opt?.label || disposition,
+        notes: dispNotes.trim(),
+        durationSec: elapsed,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const initials = target.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('')
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Soft phone"
+      onClick={() => {
+        if (phase === 'ended') onClose()
+      }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 16 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="relative flex h-[min(100dvh,740px)] w-full max-w-[390px] flex-col overflow-hidden bg-black text-white sm:h-[740px] sm:rounded-[40px]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mt-3 h-[34px] w-[126px] shrink-0 rounded-full bg-black" />
+
+        <div className="flex min-h-0 flex-1 flex-col px-6 pb-8 pt-4">
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <div className="mb-5 flex h-[88px] w-[88px] items-center justify-center rounded-full bg-[#1C1C1E]">
+              {phase === 'ended' ? (
+                <Phone className="h-9 w-9 text-white/80" />
+              ) : (
+                <span className="font-sans text-[1.75rem] font-semibold tracking-tight text-white">
+                  {initials || '?'}
+                </span>
+              )}
+            </div>
+            <h3 className="m-0 max-w-full truncate font-sans text-[1.75rem] font-normal tracking-tight text-white">
+              {target.name}
+            </h3>
+            <p className="m-0 mt-1 font-sans text-[1rem] tabular-nums text-white/55">
+              {formatDialDisplay(digits || seedDigits) || 'No number'}
+            </p>
+            <p className="m-0 mt-3 font-sans text-[0.9375rem] capitalize tabular-nums text-white/45">
+              {statusLabel}
+            </p>
+
+            {showPad && phase !== 'ended' ? (
+              <div className="mt-6 grid w-full max-w-[280px] grid-cols-3 gap-x-5 gap-y-3">
+                {padKeys.map((k) => (
+                  <button
+                    key={k.d}
+                    type="button"
+                    onClick={() => setDigits((d) => (d + k.d).slice(0, 15))}
+                    className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-[#1C1C1E] transition active:bg-[#2C2C2E]"
+                  >
+                    <span className="font-sans text-[1.65rem] font-light leading-none text-white">
+                      {k.d}
+                    </span>
+                    {k.sub ? (
+                      <span className="mt-0.5 font-sans text-[0.5625rem] font-semibold tracking-[0.12em] text-white/50">
+                        {k.sub}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {phase !== 'ended' ? (
+            <div className="mt-auto flex items-end justify-between px-2 pb-2">
+              <button
+                type="button"
+                onClick={() => setMuted((m) => !m)}
+                className="flex w-[72px] flex-col items-center gap-2"
+              >
+                <span
+                  className={`flex h-[64px] w-[64px] items-center justify-center rounded-full ${
+                    muted ? 'bg-white text-black' : 'bg-[#1C1C1E] text-white'
+                  }`}
+                >
+                  {muted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                </span>
+                <span className="font-sans text-[0.6875rem] text-white/55">mute</span>
+              </button>
+              <button type="button" onClick={endCall} className="flex w-[72px] flex-col items-center gap-2">
+                <span className="flex h-[64px] w-[64px] items-center justify-center rounded-full bg-[#FF3B30] text-white">
+                  <PhoneOff className="h-7 w-7" />
+                </span>
+                <span className="font-sans text-[0.6875rem] text-white/55">end</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPad((v) => !v)}
+                className="flex w-[72px] flex-col items-center gap-2"
+              >
+                <span
+                  className={`flex h-[64px] w-[64px] items-center justify-center rounded-full font-sans text-[0.8125rem] font-semibold ${
+                    showPad ? 'bg-white text-black' : 'bg-[#1C1C1E] text-white'
+                  }`}
+                >
+                  123
+                </span>
+                <span className="font-sans text-[0.6875rem] text-white/55">keypad</span>
+              </button>
+            </div>
+          ) : (
+            <div className="mt-auto space-y-3">
+              <select
+                value={disposition}
+                onChange={(e) => setDisposition(e.target.value)}
+                className="w-full appearance-none rounded-[12px] border-0 bg-[#1C1C1E] px-3 py-3 font-sans text-[0.875rem] text-white outline-none"
+              >
+                <option value="" className="text-black">
+                  Disposition
+                </option>
+                {DISPOSITION_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value} className="text-black">
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                value={dispNotes}
+                onChange={(e) => setDispNotes(e.target.value)}
+                placeholder="Notes"
+                rows={2}
+                className="w-full resize-none rounded-[12px] border-0 bg-[#1C1C1E] px-3 py-3 font-sans text-[0.875rem] text-white outline-none placeholder:text-white/35"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 rounded-full bg-[#1C1C1E] py-3.5 font-sans text-[0.875rem] font-semibold text-white"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  disabled={!disposition || saving}
+                  onClick={() => void saveDisposition()}
+                  className="flex-1 rounded-full bg-[#34C759] py-3.5 font-sans text-[0.875rem] font-semibold text-white disabled:opacity-40"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------------------
+ * Leads — Excel-style sheet + profile modal
+ * ------------------------------------------------------------------------- */
+
+const LEAD_COLUMNS = [
+  { key: 'first_name', label: 'First name' },
+  { key: 'last_name', label: 'Last name' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'state', label: 'State' },
+  { key: 'lob', label: 'Line of Business' },
+] as const
+
+function LeadProfileModal({
+  app,
+  onClose,
+  onCall,
+  onAudit,
+}: {
+  app: Application
+  onClose: () => void
+  onCall: () => void
+  onAudit: (
+    id: string,
+    action: string,
+    detail?: string,
+    opts?: { silent?: boolean },
+  ) => Promise<boolean>
+}) {
+  const detail = parseEnrollmentNotes(app.notes)
+  const fullSsn = getFullSsn(app.notes)
+  const [ssnRevealed, setSsnRevealed] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const fields: { label: string; value: string }[] = [
+    { label: 'First name', value: app.first_name || '—' },
+    { label: 'Last name', value: app.last_name || '—' },
+    { label: 'Email', value: app.email || '—' },
+    { label: 'Phone', value: app.phone || '—' },
+    { label: 'Date of birth', value: app.date_of_birth || '—' },
+    { label: 'Plan type', value: app.plan_type || '—' },
+    { label: 'Status', value: app.application_status.replace(/_/g, ' ') },
+    { label: 'Source', value: sourceLabel(app) },
+    {
+      label: 'Address',
+      value:
+        [app.address, app.city, app.state, app.zip].filter(Boolean).join(', ') || '—',
+    },
+    { label: 'Coverage start', value: detail?.household?.coverage_start || '—' },
+    { label: 'Submitted', value: fmtDate(app.created_at) },
+  ]
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="lead-profile-title"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8 }}
+        transition={{ duration: 0.18 }}
+        className="flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Lead profile
+            </p>
+            <h2
+              id="lead-profile-title"
+              className="m-0 mt-0.5 truncate font-medium text-[#0F3D2E]"
+              style={{ ...displayFont, fontSize: '1.25rem' }}
+            >
+              {app.first_name} {app.last_name}
+            </h2>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {enrollmentBadge(app.application_status)}
+              <span className="rounded-full bg-[#0F3D2E]/10 px-2 py-0.5 font-sans text-[0.625rem] font-semibold text-[#0F3D2E]">
+                {lineOfBusiness(app)}
+              </span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              disabled={!app.phone}
+              onClick={onCall}
+              title={app.phone ? `Call ${app.phone}` : 'No phone on file'}
+              className="inline-flex items-center justify-center border-0 bg-transparent p-1 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-40"
+            >
+              <Phone className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[10px] border-0 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] font-semibold text-[#55655D] transition hover:bg-[#0F3D2E]/[0.06] hover:text-[#0F3D2E]"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {fields.map((f) => (
+              <div
+                key={f.label}
+                className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-2.5 py-2"
+              >
+                <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  {f.label}
+                </p>
+                <p className="m-0 mt-0.5 break-words font-sans text-[0.8125rem] text-[#0F3D2E]">
+                  {f.value}
+                </p>
+              </div>
+            ))}
+            <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-2.5 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  SSN
+                </p>
+                <button
+                  type="button"
+                  disabled={!fullSsn || ssnRevealed}
+                  onClick={() => {
+                    setSsnRevealed(true)
+                    void onAudit(app.id, 'ssn_revealed', 'Leads', { silent: true })
+                  }}
+                  className="rounded-[6px] border-0 bg-transparent px-1.5 py-0.5 font-sans text-[0.5625rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] disabled:opacity-40"
+                >
+                  {ssnRevealed ? 'Revealed' : 'Reveal'}
+                </button>
+              </div>
+              <p
+                className={`m-0 mt-0.5 break-words font-sans text-[0.8125rem] text-[#0F3D2E] ${
+                  fullSsn && !ssnRevealed ? 'select-none blur-[5px]' : ''
+                }`}
+              >
+                {fullSsn || '—'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function LeadsSpreadsheetPanel({
+  applications,
+  onUpdateStatus: _onUpdateStatus,
+  onAudit,
+}: {
+  applications: Application[]
+  onUpdateStatus: (id: string, status: string) => void | Promise<void>
+  onAudit: (
+    id: string,
+    action: string,
+    detail?: string,
+    opts?: { silent?: boolean },
+  ) => Promise<boolean>
+}) {
+  const [query, setQuery] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [callTarget, setCallTarget] = useState<SoftPhoneTarget | null>(null)
+  const lastViewedId = useRef<string | null>(null)
+
+  const leads = useMemo(() => {
+    const base = applications.filter((a) => !ENROLLED_STATUSES.has(a.application_status))
+    const q = query.trim().toLowerCase()
+    if (!q) return base
+    return base.filter((a) => {
+      const hay = [
+        a.first_name,
+        a.last_name,
+        a.email,
+        a.phone,
+        a.state,
+        a.city,
+        a.plan_type,
+        a.source,
+        a.application_status,
+        lineOfBusiness(a),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  }, [applications, query])
+
+  const selected = leads.find((a) => a.id === selectedId) ?? null
+
+  useEffect(() => {
+    if (selectedId && !leads.some((a) => a.id === selectedId)) {
+      setSelectedId(null)
+    }
+  }, [leads, selectedId])
+
+  useEffect(() => {
+    if (!selectedId || lastViewedId.current === selectedId) return
+    lastViewedId.current = selectedId
+    void onAudit(selectedId, 'viewed', 'Leads', { silent: true })
+  }, [selectedId, onAudit])
+
+  const cellValue = (a: Application, key: (typeof LEAD_COLUMNS)[number]['key']) => {
+    switch (key) {
+      case 'first_name':
+        return a.first_name || ''
+      case 'last_name':
+        return a.last_name || ''
+      case 'email':
+        return a.email || ''
+      case 'phone':
+        return a.phone || ''
+      case 'state':
+        return a.state || ''
+      case 'lob':
+        return lineOfBusiness(a)
+      default:
+        return ''
+    }
+  }
+
+  const startCall = (app: Application) => {
+    if (!app.phone) return
+    setCallTarget({
+      applicationId: app.id,
+      name: `${app.first_name} ${app.last_name}`.trim(),
+      phone: app.phone,
+      context: 'Leads',
+    })
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F7F3EE]">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#0F3D2E]/10 px-3 py-2 sm:px-4">
+        <div>
+          <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+            Pipeline
+          </p>
+          <h2 className="m-0 mt-0.5 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+            Leads
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-sans text-[0.6875rem] text-[#55655D]">
+            {leads.length} row{leads.length === 1 ? '' : 's'}
+          </span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter sheet…"
+            className="w-44 rounded-[8px] border border-[#0F3D2E]/15 bg-[#E8DFD6] px-2.5 py-1.5 font-sans text-[0.75rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-56"
+          />
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 p-2 sm:p-3">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[4px] border border-[#A8B5AE] bg-[#FAFCFB] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+          <div className="flex shrink-0 items-center gap-2 border-b border-[#A8B5AE] bg-[#0F3D2E] px-2 py-1.5">
+            <span className="rounded-[2px] bg-[#E8DFD6] px-1.5 py-0.5 font-sans text-[0.625rem] font-bold text-[#0F3D2E]">
+              Workbook
+            </span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto">
+            <table className="w-max min-w-full border-collapse font-sans text-[0.75rem]">
+              <thead className="sticky top-0 z-10">
+                <tr>
+                  <th className="sticky left-0 z-20 w-10 border border-[#A8B5AE] bg-[#D8E0DB] px-1 py-1 text-center font-semibold text-[#55655D]">
+                    #
+                  </th>
+                  {LEAD_COLUMNS.map((col) => (
+                    <th
+                      key={col.key}
+                      className="min-w-[7.5rem] border border-[#A8B5AE] bg-[#D8E0DB] px-2 py-1 text-left font-semibold text-[#0F3D2E]"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {leads.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={LEAD_COLUMNS.length + 1}
+                      className="border border-[#A8B5AE] px-3 py-8 text-center text-[#55655D]"
+                    >
+                      No leads in the pipeline.
+                    </td>
+                  </tr>
+                ) : (
+                  leads.map((a, i) => {
+                    const isSelected = selectedId === a.id
+                    return (
+                      <tr
+                        key={a.id}
+                        onClick={() => setSelectedId(a.id)}
+                        className={`cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#C9E4D0]'
+                            : i % 2 === 0
+                              ? 'bg-[#FAFCFB] hover:bg-[#EEF4F0]'
+                              : 'bg-[#F3F6F4] hover:bg-[#EEF4F0]'
+                        }`}
+                      >
+                        <td className="sticky left-0 z-[1] border border-[#A8B5AE] bg-inherit px-1 py-1 text-center font-semibold text-[#55655D]">
+                          {i + 1}
+                        </td>
+                        {LEAD_COLUMNS.map((col) => (
+                          <td
+                            key={col.key}
+                            className="max-w-[14rem] truncate border border-[#A8B5AE] px-2 py-1 text-[#0F3D2E]"
+                            title={cellValue(a, col.key)}
+                          >
+                            {cellValue(a, col.key) || '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex shrink-0 items-center justify-between border-t border-[#A8B5AE] bg-[#E8EFEA] px-2 py-1 font-sans text-[0.625rem] text-[#55655D]">
+            <span>Ready</span>
+            <span>Select a row to open profile</span>
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {selected && !callTarget ? (
+          <LeadProfileModal
+            key={selected.id}
+            app={selected}
+            onClose={() => setSelectedId(null)}
+            onCall={() => startCall(selected)}
+            onAudit={onAudit}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {callTarget ? (
+          <SoftPhoneDialer
+            key={callTarget.applicationId}
+            target={callTarget}
+            onClose={() => setCallTarget(null)}
+            onComplete={async (payload) => {
+              await onAudit(
+                callTarget.applicationId,
+                'call_disposition',
+                `${payload.dispositionGroup}: ${payload.dispositionLabel}${
+                  payload.notes ? ` · ${payload.notes}` : ''
+                } · ${payload.durationSec}s`,
+                { silent: true },
+              )
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -837,69 +2612,34 @@ function OfficeCalendar({
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
 
   return (
-    <div className="overflow-hidden bg-[#FAFCFB]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-5 py-4">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F7F3EE]">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#0F3D2E]/10 bg-[#F7F3EE] px-3 py-2.5 sm:px-4">
         <div>
-          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-[#C9A961]">
+          <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
             Calendar
           </p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-3">
-            <h2 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.45rem' }}>
-              {monthNames[month]} {year}
-            </h2>
-            <div className="flex items-center gap-2 font-sans text-[0.75rem] font-semibold">
-              <button
-                type="button"
-                onClick={() => setCursor(new Date(year, month - 1, 1))}
-                className="text-[#55655D] transition hover:text-[#0F3D2E]"
-              >
-                Prev
-              </button>
-              <span className="text-[#B89A78]" aria-hidden>
-                ·
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const now = new Date()
-                  setCursor(new Date(now.getFullYear(), now.getMonth(), 1))
-                  setSelectedDay(now.getDate())
-                }}
-                className="text-[#55655D] transition hover:text-[#0F3D2E]"
-              >
-                Today
-              </button>
-              <span className="text-[#B89A78]" aria-hidden>
-                ·
-              </span>
-              <button
-                type="button"
-                onClick={() => setCursor(new Date(year, month + 1, 1))}
-                className="text-[#55655D] transition hover:text-[#0F3D2E]"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <h2 className="m-0 mt-0.5 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+            {monthNames[month]} {year}
+          </h2>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.8fr)]">
-        <div className="p-4 sm:p-5">
-          <div className="mb-2 grid grid-cols-7 gap-1">
+      <div className="grid min-h-0 flex-1 grid-cols-1 bg-[#F7F3EE] lg:grid-cols-[minmax(0,1.45fr)_minmax(200px,0.7fr)]">
+        <div className="flex min-h-0 flex-col bg-[#F7F3EE] p-2 sm:p-3">
+          <div className="mb-1 grid shrink-0 grid-cols-7 gap-0.5">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
               <div
                 key={d}
-                className="py-1 text-center font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]"
+                className="py-0.5 text-center font-sans text-[0.625rem] font-semibold uppercase tracking-[0.06em] text-[#55655D]"
               >
                 {d}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-0.5">
             {cells.map((day, i) => {
               if (day == null) {
-                return <div key={`e-${i}`} className="aspect-square min-h-[2.75rem]" />
+                return <div key={`e-${i}`} className="min-h-0" />
               }
               const ev = eventsByDay.get(day)
               const isToday =
@@ -912,25 +2652,25 @@ function OfficeCalendar({
                   key={day}
                   type="button"
                   onClick={() => setSelectedDay(day)}
-                  className={`relative flex aspect-square min-h-[2.75rem] flex-col items-center justify-start rounded-[12px] pt-1.5 font-sans text-[0.8125rem] transition ${
+                  className={`relative flex min-h-0 flex-col items-center justify-start rounded-[8px] border-0 pt-1 font-sans text-[0.75rem] shadow-none outline-none transition ${
                     isSelected
-                      ? 'bg-[#0F3D2E] text-[#FAFCFB] shadow-[0_4px_12px_rgba(15,61,46,0.25)]'
+                      ? 'bg-[#0F3D2E] font-semibold text-[#FAFCFB]'
                       : isToday
-                        ? 'bg-[#C9A961]/25 font-semibold text-[#0F3D2E]'
-                        : 'text-[#0F3D2E] hover:bg-[#0F3D2E]/[0.06]'
+                        ? 'bg-[#E0D6CA] font-semibold text-[#0F3D2E]'
+                        : 'bg-[#E8DFD6] text-[#0F3D2E] hover:bg-[#E0D6CA]'
                   }`}
                 >
                   <span>{day}</span>
                   {ev && (ev.apps > 0 || ev.careers > 0) ? (
-                    <span className="mt-auto mb-1.5 flex gap-0.5">
+                    <span className="mt-auto mb-1 flex gap-0.5">
                       {ev.apps > 0 ? (
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-[#C9A961]' : 'bg-[#0F3D2E]'}`}
+                          className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#C9A961]' : 'bg-[#0F3D2E]'}`}
                         />
                       ) : null}
                       {ev.careers > 0 ? (
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-[#E8DFD6]' : 'bg-[#C9A961]'}`}
+                          className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#E8DFD6]' : 'bg-[#C9A961]'}`}
                         />
                       ) : null}
                     </span>
@@ -941,37 +2681,37 @@ function OfficeCalendar({
           </div>
         </div>
 
-        <aside className="border-t border-[#0F3D2E]/10 bg-[#F7F3EE] p-5 lg:border-l lg:border-t-0">
-          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+        <aside className="flex min-h-0 flex-col border-t border-[#0F3D2E]/10 bg-[#F7F3EE] p-3 lg:border-l lg:border-t-0">
+          <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
             Day detail
           </p>
-          <p className="m-0 mt-1 font-sans text-[0.9375rem] font-semibold text-[#0F3D2E]">
+          <p className="m-0 mt-1 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
             {selectedLabel ?? 'Select a day'}
           </p>
-          <div className="mt-4 space-y-3">
-            <div className="rounded-[14px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3.5 py-3">
-              <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+          <div className="mt-3 space-y-2">
+            <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2">
+              <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
                 Client applications
               </p>
-              <p className="m-0 mt-1 font-sans text-[1.75rem] font-semibold leading-none text-[#0F3D2E]">
+              <p className="m-0 mt-0.5 font-sans text-[1.35rem] font-semibold leading-none text-[#0F3D2E]">
                 {selectedEvents?.apps ?? 0}
               </p>
             </div>
-            <div className="rounded-[14px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3.5 py-3">
-              <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+            <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2">
+              <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
                 Career applications
               </p>
-              <p className="m-0 mt-1 font-sans text-[1.75rem] font-semibold leading-none text-[#0F3D2E]">
+              <p className="m-0 mt-0.5 font-sans text-[1.35rem] font-semibold leading-none text-[#0F3D2E]">
                 {selectedEvents?.careers ?? 0}
               </p>
             </div>
           </div>
-          <div className="mt-5 flex flex-wrap gap-3 font-sans text-[0.6875rem] text-[#55655D]">
+          <div className="mt-auto flex flex-wrap gap-3 pt-3 font-sans text-[0.625rem] text-[#55655D]">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#0F3D2E]" /> Clients
+              <span className="h-1.5 w-1.5 rounded-full bg-[#0F3D2E]" /> Clients
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#C9A961]" /> Careers
+              <span className="h-1.5 w-1.5 rounded-full bg-[#C9A961]" /> Careers
             </span>
           </div>
         </aside>
@@ -990,28 +2730,27 @@ function FilesWorkspace({
   rows,
   selected,
   query,
-  sales,
-  acaCount,
-  medicareCount,
-  enrolledCount,
   onQuery,
   onFolder,
   onSelect,
   onUpdateStatus,
+  onAudit,
 }: {
   folder: FileFolderId
   counts: Record<FileFolderId, number>
   rows: Application[]
   selected: Application | null
   query: string
-  sales: { last7: number; conversion: number }
-  acaCount: number
-  medicareCount: number
-  enrolledCount: number
   onQuery: (q: string) => void
   onFolder: (id: FileFolderId) => void
   onSelect: (id: string) => void
   onUpdateStatus: (id: string, status: string) => void | Promise<void>
+  onAudit: (
+    id: string,
+    action: string,
+    detail?: string,
+    opts?: { silent?: boolean },
+  ) => Promise<boolean>
 }) {
   const folders: { id: FileFolderId; name: string; path: string }[] = [
     { id: 'all', name: 'All Applications', path: '/Applications' },
@@ -1023,89 +2762,27 @@ function FilesWorkspace({
 
   const activePath = folders.find((f) => f.id === folder)?.path ?? '/Applications'
 
-  const miniStats: {
-    id: FileFolderId
-    label: string
-    value: number
-    sub: string
-  }[] = [
-    {
-      id: 'all',
-      label: 'All',
-      value: counts.all,
-      sub: `${sales.last7} / 7d`,
-    },
-    {
-      id: 'aca',
-      label: 'ACA',
-      value: acaCount,
-      sub: 'Marketplace',
-    },
-    {
-      id: 'medicare',
-      label: 'Medicare',
-      value: medicareCount,
-      sub: 'Reviews',
-    },
-    {
-      id: 'enrolled',
-      label: 'Active',
-      value: enrolledCount,
-      sub: `${sales.conversion}%`,
-    },
-  ]
-
   return (
-    <div className="overflow-hidden bg-[#FAFCFB]">
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-4 py-3">
-        <div className="mr-1 hidden min-w-0 shrink-0 sm:block">
-          <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-            Clients
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F7F3EE]">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-3 py-2">
+        <div className="mr-1 min-w-0 shrink-0">
+          <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+            Applications
           </p>
-          <p className="m-0 truncate font-mono text-[0.6875rem] text-[#0F3D2E]">{activePath}</p>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          {miniStats.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => onFolder(s.id)}
-              className={`min-w-[4.5rem] rounded-[10px] border px-2 py-1.5 text-left transition ${
-                folder === s.id
-                  ? 'border-[#0F3D2E] bg-[#0F3D2E] text-[#FAFCFB]'
-                  : 'border-[#0F3D2E]/12 bg-[#FAFCFB] text-[#0F3D2E] hover:border-[#0F3D2E]/30'
-              }`}
-            >
-              <p
-                className={`m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] ${
-                  folder === s.id ? 'text-white/70' : 'text-[#55655D]'
-                }`}
-              >
-                {s.label}
-              </p>
-              <p className="m-0 font-sans text-[0.9375rem] font-semibold leading-tight">{s.value}</p>
-              <p
-                className={`m-0 truncate font-sans text-[0.5625rem] ${
-                  folder === s.id ? 'text-white/60' : 'text-[#55655D]'
-                }`}
-              >
-                {s.sub}
-              </p>
-            </button>
-          ))}
+          <p className="m-0 truncate font-mono text-[0.625rem] text-[#0F3D2E]">{activePath}</p>
         </div>
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           placeholder="Search name, email, state, source…"
-          className="w-full max-w-xs rounded-[12px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-56"
+          className="w-full max-w-xs rounded-[12px] border border-[#0F3D2E]/15 bg-[#E8DFD6] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-56"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)_minmax(0,1.1fr)]">
         {/* Folder tree */}
-        <aside className="border-b border-[#0F3D2E]/10 bg-[#F7F3EE] p-3 lg:border-b-0 lg:border-r">
-          <p className="mb-2 px-2 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
+        <aside className="min-h-0 overflow-y-auto border-b border-[#0F3D2E]/10 bg-[#F7F3EE] p-2 lg:border-b-0 lg:border-r-0">
+          <p className="mb-1.5 px-2 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
             Folders
           </p>
           <div className="space-y-1">
@@ -1114,16 +2791,16 @@ function FilesWorkspace({
                 key={f.id}
                 type="button"
                 onClick={() => onFolder(f.id)}
-                className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left font-sans text-[0.8125rem] transition ${
+                className={`flex w-full items-center justify-between rounded-[12px] border-0 px-3 py-2.5 text-left font-sans text-[0.8125rem] shadow-none outline-none transition ${
                   folder === f.id
-                    ? 'bg-[linear-gradient(135deg,#0F3D2E_0%,#14432A_100%)] font-semibold text-[#FAFCFB] shadow-[0_4px_12px_rgba(15,61,46,0.2)]'
-                    : 'font-medium text-[#0F3D2E] hover:bg-[#FAFCFB]'
+                    ? 'bg-[#0F3D2E] font-semibold text-[#E8DFD6]'
+                    : 'bg-transparent font-medium text-[#0F3D2E] hover:bg-[#E8DFD6]'
                 }`}
               >
                 <span className="truncate">{f.name}</span>
                 <span
                   className={`ml-2 rounded-full px-2 py-0.5 text-[0.6875rem] ${
-                    folder === f.id ? 'bg-white/15 text-white' : 'bg-[#0F3D2E]/10 text-[#55655D]'
+                    folder === f.id ? 'bg-[#C9A961] text-[#0F3D2E]' : 'bg-[#0F3D2E]/10 text-[#55655D]'
                   }`}
                 >
                   {counts[f.id]}
@@ -1134,17 +2811,17 @@ function FilesWorkspace({
         </aside>
 
         {/* File list */}
-        <section className="min-h-[420px] border-b border-[#0F3D2E]/08 lg:border-b-0 lg:border-r">
+        <section className="min-h-0 overflow-hidden border-b border-[#0F3D2E]/08 lg:border-b-0 lg:border-r-0">
           {rows.length === 0 ? (
-            <div className="flex h-full min-h-[420px] items-center justify-center p-6">
-              <p className="m-0 text-center font-sans text-[0.875rem] text-[#55655D]">
+            <div className="flex h-full items-center justify-center p-4">
+              <p className="m-0 text-center font-sans text-[0.8125rem] text-[#55655D]">
                 {folder === 'medicare'
                   ? 'No Medicare.Reviews applications yet. They appear here when medicare.reviews POSTs to /api/enrollment/medicare with source tagging.'
                   : 'This folder is empty.'}
               </p>
             </div>
           ) : (
-            <ul className="max-h-[640px] divide-y divide-[#0F3D2E]/08 overflow-y-auto">
+            <ul className="h-full space-y-2 overflow-y-auto p-2">
               {rows.map((a) => {
                 const active = selected?.id === a.id
                 return (
@@ -1152,26 +2829,28 @@ function FilesWorkspace({
                     <button
                       type="button"
                       onClick={() => onSelect(a.id)}
-                      className={`flex w-full items-start gap-3 px-4 py-3.5 text-left transition ${
-                        active ? 'bg-[#0F3D2E]/[0.06]' : 'hover:bg-[#FAFCFB]'
+                      className={`flex w-full items-start gap-2.5 rounded-[14px] border-0 px-3 py-2.5 text-left shadow-none outline-none transition ${
+                        active
+                          ? 'bg-[#C9B396]'
+                          : 'bg-[#E8DFD6] hover:bg-[#E0D6CA]'
                       }`}
                     >
-                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#0F3D2E]/10 font-sans text-[0.6875rem] font-bold text-[#0F3D2E]">
+                      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#0F3D2E]/10 font-sans text-[0.625rem] font-bold text-[#0F3D2E]">
                         {isMedicareApplication(a) ? 'MR' : isAcaApplication(a) ? 'ACA' : 'APP'}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
-                          <span className="font-sans text-[0.875rem] font-semibold text-[#0F3D2E]">
+                          <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
                             {a.first_name} {a.last_name}
                           </span>
                           {statusBadge(a.application_status)}
                         </span>
-                        <span className="mt-0.5 block truncate font-sans text-[0.75rem] text-[#55655D]">
+                        <span className="mt-0.5 block truncate font-sans text-[0.6875rem] text-[#55655D]">
                           {sourceLabel(a)}
                           {a.plan_type ? ` · ${a.plan_type}` : ''}
                           {a.state ? ` · ${a.state}` : ''}
                         </span>
-                        <span className="mt-0.5 block font-sans text-[0.6875rem] text-[#55655D]/80">
+                        <span className="mt-0.5 block font-sans text-[0.625rem] text-[#55655D]/80">
                           {fmtShort(a.created_at)}
                         </span>
                       </span>
@@ -1184,15 +2863,19 @@ function FilesWorkspace({
         </section>
 
         {/* Detail pane */}
-        <section className="min-h-[420px] bg-white p-5">
+        <section className="min-h-0 overflow-y-auto bg-[#F7F3EE] p-3 sm:p-4">
           {!selected ? (
-            <div className="flex h-full min-h-[380px] items-center justify-center">
-              <p className="m-0 font-sans text-[0.875rem] text-[#55655D]">
+            <div className="flex h-full items-center justify-center">
+              <p className="m-0 font-sans text-[0.8125rem] text-[#55655D]">
                 Select a file to inspect the application record.
               </p>
             </div>
           ) : (
-            <ApplicationDetail app={selected} onUpdateStatus={onUpdateStatus} />
+            <ApplicationDetail
+              app={selected}
+              onUpdateStatus={onUpdateStatus}
+              onAudit={onAudit}
+            />
           )}
         </section>
       </div>
@@ -1203,11 +2886,32 @@ function FilesWorkspace({
 function ApplicationDetail({
   app,
   onUpdateStatus,
+  onAudit,
 }: {
   app: Application
   onUpdateStatus: (id: string, status: string) => void | Promise<void>
+  onAudit: (
+    id: string,
+    action: string,
+    detail?: string,
+    opts?: { silent?: boolean },
+  ) => Promise<boolean>
 }) {
   const detail = parseEnrollmentNotes(app.notes)
+  const fullSsn = getFullSsn(app.notes)
+  const [ssnRevealed, setSsnRevealed] = useState(false)
+  const lastViewedId = useRef<string | null>(null)
+
+  useEffect(() => {
+    setSsnRevealed(false)
+  }, [app.id])
+
+  useEffect(() => {
+    if (lastViewedId.current === app.id) return
+    lastViewedId.current = app.id
+    void onAudit(app.id, 'viewed', 'Applications', { silent: true })
+  }, [app.id, onAudit])
+
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1221,6 +2925,9 @@ function ApplicationDetail({
           <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
             Submitted {fmtDate(app.created_at)}
           </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {enrollmentBadge(app.application_status)}
+          </div>
         </div>
         <select
           value={app.application_status}
@@ -1246,8 +2953,10 @@ function ApplicationDetail({
             value: [app.address, app.city, app.state, app.zip].filter(Boolean).join(', ') || '—',
           },
           { label: 'Source', value: app.source || sourceLabel(app) },
+          { label: 'Agent of Record', value: getAgentOfRecord(app.notes) || '—' },
+          { label: 'Application ID', value: app.id },
         ].map((row) => (
-          <div key={row.label} className="rounded-[12px] bg-[#FAFCFB] px-3 py-2.5">
+          <div key={row.label} className="rounded-[12px] bg-[#E8DFD6] px-3 py-2.5">
             <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
               {row.label}
             </p>
@@ -1256,10 +2965,35 @@ function ApplicationDetail({
             </p>
           </div>
         ))}
+        <div className="rounded-[12px] bg-[#E8DFD6] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+              SSN
+            </p>
+            <button
+              type="button"
+              disabled={!fullSsn || ssnRevealed}
+              onClick={() => {
+                setSsnRevealed(true)
+                void onAudit(app.id, 'ssn_revealed', 'Applications', { silent: true })
+              }}
+              className="rounded-[6px] border-0 bg-transparent px-1.5 py-0.5 font-sans text-[0.625rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.08] disabled:opacity-40"
+            >
+              {ssnRevealed ? 'Revealed' : 'Reveal'}
+            </button>
+          </div>
+          <p
+            className={`m-0 mt-1 break-words font-sans text-[0.875rem] text-[#0F3D2E] ${
+              fullSsn && !ssnRevealed ? 'select-none blur-[5px]' : ''
+            }`}
+          >
+            {fullSsn || '—'}
+          </p>
+        </div>
       </div>
 
       {detail ? (
-        <div className="mt-5 rounded-[14px] border border-[#0F3D2E]/08 bg-[#F7FAF8] p-4">
+        <div className="mt-5 rounded-[14px] border border-[#0F3D2E]/08 bg-[#E8DFD6] p-4">
           <p className="m-0 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
             Enrollment packet
           </p>
@@ -1288,9 +3022,6 @@ function ApplicationDetail({
                 {detail.household.filing_status ? ` · ${detail.household.filing_status}` : ''}
               </p>
             ) : null}
-            {detail.applicant?.ssn_last4 ? (
-              <p className="m-0">SSN ****{detail.applicant.ssn_last4}</p>
-            ) : null}
             {detail.sep?.qualifying_event ? (
               <p className="m-0">
                 SEP: {detail.sep.qualifying_event}
@@ -1308,7 +3039,29 @@ function ApplicationDetail({
         </pre>
       ) : null}
 
-      <div className="mt-5 rounded-[14px] border border-dashed border-[#0F3D2E]/15 px-4 py-5 text-center">
+      {getMicroLedger(app.notes).length > 0 ? (
+        <div className="mt-4 rounded-[12px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2.5">
+          <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+            Micro ledger
+          </p>
+          <ul className="m-0 mt-1.5 max-h-32 list-none space-y-0.5 overflow-y-auto p-0">
+            {getMicroLedger(app.notes)
+              .slice(0, 40)
+              .map((e, i) => (
+                <li
+                  key={`${e.at}-${e.action}-${i}`}
+                  className="font-sans text-[0.5625rem] leading-snug text-[#55655D]"
+                >
+                  {fmtShort(e.at)} · {e.action.replace(/_/g, ' ').toLowerCase()}
+                  {e.actor ? ` · ${e.actor}` : ''}
+                  {e.detail ? ` · ${e.detail}` : ''}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="mt-5 rounded-[14px] border border-dashed border-[#0F3D2E]/15 bg-[#E8DFD6] px-4 py-5 text-center">
         <p className="m-0 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
           Document folder
         </p>
@@ -1438,7 +3191,7 @@ function EmployeesWorkspace({
             className={`rounded-full px-4 py-2 font-sans text-[0.8125rem] font-semibold transition ${
               view === t.id
                 ? 'bg-[#0F3D2E] text-white'
-                : 'bg-white text-[#0F3D2E] hover:bg-[#0F3D2E]/[0.06]'
+                : 'bg-[#E8DFD6] text-[#0F3D2E] hover:bg-[#E0D6CA]'
             }`}
           >
             {t.label}
@@ -1529,6 +3282,10 @@ function EmployeesWorkspace({
 
 function SalesMarketingPanel({
   sales,
+  counts,
+  acaCount,
+  medicareCount,
+  enrolledCount,
 }: {
   sales: {
     bySource: Record<string, number>
@@ -1538,14 +3295,43 @@ function SalesMarketingPanel({
     conversion: number
     enrolled: number
   }
+  counts: Record<FileFolderId, number>
+  acaCount: number
+  medicareCount: number
+  enrolledCount: number
 }) {
   const topStates = Object.entries(sales.byState)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
   const total = Object.values(sales.bySource).reduce((a, b) => a + b, 0)
 
+  const miniStats = [
+    { label: 'All', value: counts.all, sub: `${sales.last7} / 7d` },
+    { label: 'ACA', value: acaCount, sub: 'Marketplace' },
+    { label: 'Medicare', value: medicareCount, sub: 'Reviews' },
+    { label: 'Active', value: enrolledCount, sub: `${sales.conversion}%` },
+  ]
+
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {miniStats.map((s) => (
+          <div
+            key={s.label}
+            className="min-w-[5.5rem] flex-1 rounded-[12px] bg-[#E8DFD6] px-3 py-2.5 sm:flex-none"
+          >
+            <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+              {s.label}
+            </p>
+            <p className="m-0 mt-0.5 font-sans text-[1.25rem] font-semibold leading-tight text-[#0F3D2E]">
+              {s.value}
+            </p>
+            <p className="m-0 truncate font-sans text-[0.625rem] text-[#55655D]">{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className={`${cardClass} lg:col-span-2`}>
         <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
           Marketing attribution
@@ -1630,6 +3416,7 @@ function SalesMarketingPanel({
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
