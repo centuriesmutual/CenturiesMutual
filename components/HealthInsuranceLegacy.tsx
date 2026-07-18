@@ -30,12 +30,12 @@ const PARTNERS: ReadonlyArray<Partner> = [
     logo: '/partners/intuit.svg',
   },
   {
-    name: 'Paymentus',
-    category: 'Bill Pay',
-    blurb: 'Bill pay rails for utilities, rent, and member payments in one flow.',
-    logo: '/partners/paymentus.png',
+    name: 'Robinhood',
+    category: 'Brokerage & Cash Out',
+    blurb: 'Link brokerage cash so members can move rewards into their Robinhood account.',
+    logo: '/partners/robinhood.svg',
     logoFit: 'contain',
-    logoWellClassName: 'bg-[#134B74] ring-[#134B74]',
+    logoWellClassName: 'bg-black ring-[#14432A]/20',
   },
   {
     name: 'IBM',
@@ -58,10 +58,12 @@ const PARTNERS: ReadonlyArray<Partner> = [
     logo: '/partners/walgreens.svg',
   },
   {
-    name: 'Amazon',
-    category: 'Distribution & Logistics',
-    blurb: 'Consumer distribution and logistics for member delivery.',
-    logo: '/partners/amazon.svg',
+    name: 'Paymentus',
+    category: 'Bill Pay',
+    blurb: 'Bill pay rails for utilities, rent, and member payments in one flow.',
+    logo: '/partners/paymentus.png',
+    logoFit: 'contain',
+    logoWellClassName: 'bg-[#134B74] ring-[#134B74]',
   },
 ]
 
