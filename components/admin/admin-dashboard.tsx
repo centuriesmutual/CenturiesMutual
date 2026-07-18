@@ -93,9 +93,9 @@ type AcaState = {
   status: string
 }
 
-type WorkspaceId = 'overview' | 'files' | 'employees' | 'operations' | 'ledger'
+type WorkspaceId = 'overview' | 'files' | 'employees' | 'intelligence' | 'operations' | 'ledger'
 type FileFolderId = 'all' | 'aca' | 'medicare' | 'enrolled' | 'other'
-type EmployeePanelId = 'overview' | 'hiring' | 'job-board' | 'sales'
+type WorkforceView = 'directory' | 'hiring' | 'job-board'
 
 const APPLICATION_STATUSES = [
   'submitted',
@@ -142,7 +142,8 @@ const EMPTY_LISTING = {
 const NAV_TABS: { id: Exclude<WorkspaceId, 'operations'>; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'files', label: 'Clients' },
-  { id: 'employees', label: 'Employees' },
+  { id: 'employees', label: 'Workforce' },
+  { id: 'intelligence', label: 'Intelligence' },
   { id: 'ledger', label: 'Ledger' },
 ]
 
@@ -269,7 +270,6 @@ export function AdminDashboard({
 }) {
   const [workspace, setWorkspace] = useState<WorkspaceId>('overview')
   const [folder, setFolder] = useState<FileFolderId>('all')
-  const [employeePanel, setEmployeePanel] = useState<EmployeePanelId>('overview')
   const [opsPanel, setOpsPanel] = useState<'flags' | 'states'>('flags')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -518,7 +518,7 @@ export function AdminDashboard({
       return
     }
     setCareers((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)))
-    setFlash('Hiring pipeline updated.')
+    setFlash('Application status updated.')
   }
 
   return (
@@ -600,146 +600,159 @@ export function AdminDashboard({
           />
         </div>
 
-        {/* Workspace nav — minimal folder tabs */}
-        <nav className="mb-8" aria-label="Office sections">
-          <div className="flex items-end gap-1 overflow-x-auto border-b border-[#B89A78] px-0.5">
-            {NAV_TABS.map((w) => {
-              const active = workspace === w.id
-              return (
-                <button
-                  key={w.id}
-                  type="button"
-                  onClick={() => setWorkspace(w.id)}
-                  className={`relative -mb-px flex shrink-0 items-center gap-1.5 rounded-t-[10px] border border-b-0 px-4 py-2.5 font-sans text-[0.8125rem] font-semibold transition ${
-                    active
-                      ? 'z-10 border-[#B89A78] bg-[#F7F3EE] text-[#0F3D2E]'
-                      : 'z-0 border-transparent bg-[#C9B396]/55 text-[#0F3D2E]/70 hover:bg-[#C9B396]/85 hover:text-[#0F3D2E]'
-                  }`}
-                >
-                  {w.label}
-                  {w.id === 'files' ? (
-                    <span
-                      className={`inline-flex min-w-[1.15rem] items-center justify-center rounded-full px-1.5 py-0.5 font-sans text-[0.625rem] font-bold leading-none ${
-                        active
-                          ? 'bg-[#0F3D2E] text-[#FAFCFB]'
-                          : 'bg-[#0F3D2E]/75 text-[#FAFCFB]'
-                      }`}
-                    >
-                      {clientsBadge > 99 ? '99+' : clientsBadge}
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-        </nav>
-
-        {flash ? (
-          <p className="mb-4 rounded-[12px] border border-[#0F3D2E]/10 bg-[#E8F0EA] px-4 py-3 font-sans text-[0.875rem] text-[#0F3D2E]">
-            {flash}
-          </p>
-        ) : null}
-        {error ? (
-          <p className="mb-4 rounded-[12px] bg-[#B42318]/[0.08] px-4 py-3 font-sans text-[0.875rem] text-[#B42318]">
-            {error}
-          </p>
-        ) : null}
-
-        {loading ? (
-          <div className={`${cardClass} py-16 text-center`}>
-            <p className="m-0 font-sans text-[0.9375rem] text-[#55655D]">Loading workspace…</p>
-          </div>
-        ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={workspace}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22 }}
-            >
-              {workspace === 'overview' && (
-                <OverviewPanel applications={applications} careers={careers} />
-              )}
-
-              {workspace === 'files' && (
-                <FilesWorkspace
-                  folder={folder}
-                  counts={folderCounts}
-                  rows={folderRows}
-                  selected={selected}
-                  query={query}
-                  sales={salesStats}
-                  acaCount={acaApplications.length}
-                  medicareCount={medicareApplications.length}
-                  enrolledCount={enrollments.length}
-                  onQuery={setQuery}
-                  onFolder={(id) => {
-                    setFolder(id)
-                    setSelectedId(null)
-                  }}
-                  onSelect={setSelectedId}
-                  onUpdateStatus={updateStatus}
-                />
-              )}
-
-              {workspace === 'employees' && (
-                <EmployeesWorkspace
-                  panel={employeePanel}
-                  onPanel={setEmployeePanel}
-                  careers={careers}
-                  listings={listings}
-                  hiringStats={hiringStats}
-                  sales={salesStats}
-                  onUpdateCareer={updateCareerStatus}
-                  onListingsChange={setListings}
-                  onFlash={setFlash}
-                />
-              )}
-
-              {workspace === 'operations' && (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        { id: 'flags' as const, label: 'ACA enrollment flags' },
-                        { id: 'states' as const, label: 'State licensing' },
-                      ] as const
-                    ).map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setOpsPanel(p.id)}
-                        className={`rounded-[12px] px-4 py-2 font-sans text-[0.8125rem] font-semibold transition ${
-                          opsPanel === p.id
+        {/* Workspace folder: tabs sit on the content panel */}
+        <div>
+          <nav className="relative z-10" aria-label="Office sections">
+            <div className="flex items-end gap-1 px-0.5">
+              {NAV_TABS.map((w) => {
+                const active = workspace === w.id
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setWorkspace(w.id)}
+                    className={`relative mb-[-1px] flex shrink-0 items-center gap-1.5 rounded-t-[10px] border px-4 py-2.5 font-sans text-[0.8125rem] font-semibold transition ${
+                      active
+                        ? 'z-10 border-[#B89A78] border-b-[#FAFCFB] bg-[#FAFCFB] text-[#0F3D2E]'
+                        : 'z-0 border-transparent bg-[#C9B396]/55 text-[#0F3D2E]/70 hover:bg-[#C9B396]/85 hover:text-[#0F3D2E]'
+                    }`}
+                  >
+                    {w.label}
+                    {w.id === 'files' ? (
+                      <span
+                        className={`inline-flex min-w-[1.15rem] items-center justify-center rounded-full px-1.5 py-0.5 font-sans text-[0.625rem] font-bold leading-none ${
+                          active
                             ? 'bg-[#0F3D2E] text-[#FAFCFB]'
-                            : 'border border-[#0F3D2E]/10 bg-[#FAFCFB] text-[#0F3D2E] hover:bg-[#0F3D2E]/[0.06]'
+                            : 'bg-[#0F3D2E]/75 text-[#FAFCFB]'
                         }`}
                       >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                  {opsPanel === 'flags' ? (
-                    <AcaEnrollmentFlagsPanel
-                      flags={acaFlags}
-                      onChange={setAcaFlags}
-                      onFlash={setFlash}
-                    />
-                  ) : (
-                    <AcaStateLicensingPanel
-                      states={acaStates}
-                      onChange={setAcaStates}
-                      onFlash={setFlash}
+                        {clientsBadge > 99 ? '99+' : clientsBadge}
+                      </span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          </nav>
+
+          <div className="overflow-hidden rounded-b-[20px] rounded-tr-[20px] border border-[#B89A78] bg-[#FAFCFB] shadow-[0_4px_20px_rgba(15,61,46,0.05)]">
+            {flash ? (
+              <p className="m-0 border-b border-[#0F3D2E]/10 bg-[#E8F0EA] px-4 py-3 font-sans text-[0.875rem] text-[#0F3D2E]">
+                {flash}
+              </p>
+            ) : null}
+            {error ? (
+              <p className="m-0 border-b border-[#0F3D2E]/10 bg-[#B42318]/[0.08] px-4 py-3 font-sans text-[0.875rem] text-[#B42318]">
+                {error}
+              </p>
+            ) : null}
+            {loading ? (
+              <div className="py-16 text-center">
+                <p className="m-0 font-sans text-[0.9375rem] text-[#55655D]">Loading workspace…</p>
+              </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={workspace}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="[&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none [&>*]:hover:translate-y-0 [&>*]:hover:shadow-none"
+                >
+                  {workspace === 'overview' && (
+                    <OverviewPanel applications={applications} careers={careers} />
+                  )}
+
+                  {workspace === 'files' && (
+                    <FilesWorkspace
+                      folder={folder}
+                      counts={folderCounts}
+                      rows={folderRows}
+                      selected={selected}
+                      query={query}
+                      sales={salesStats}
+                      acaCount={acaApplications.length}
+                      medicareCount={medicareApplications.length}
+                      enrolledCount={enrollments.length}
+                      onQuery={setQuery}
+                      onFolder={(id) => {
+                        setFolder(id)
+                        setSelectedId(null)
+                      }}
+                      onSelect={setSelectedId}
+                      onUpdateStatus={updateStatus}
                     />
                   )}
-                </div>
-              )}
 
-              {workspace === 'ledger' && <LedgerTable rows={ledger} note={ledgerNote} />}
-            </motion.div>
-          </AnimatePresence>
-        )}
+                  {workspace === 'employees' && (
+                    <div className="p-4 sm:p-5">
+                      <EmployeesWorkspace
+                        careers={careers}
+                        listings={listings}
+                        hiringStats={hiringStats}
+                        onUpdateCareer={updateCareerStatus}
+                        onListingsChange={setListings}
+                        onFlash={setFlash}
+                      />
+                    </div>
+                  )}
+
+                  {workspace === 'intelligence' && (
+                    <div className="p-4 sm:p-5">
+                      <SalesMarketingPanel sales={salesStats} />
+                    </div>
+                  )}
+
+                  {workspace === 'operations' && (
+                    <div className="space-y-4 p-4 sm:p-5">
+                      <div className="flex flex-wrap gap-2">
+                        {(
+                          [
+                            { id: 'flags' as const, label: 'ACA enrollment flags' },
+                            { id: 'states' as const, label: 'State licensing' },
+                          ] as const
+                        ).map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setOpsPanel(p.id)}
+                            className={`rounded-[12px] px-4 py-2 font-sans text-[0.8125rem] font-semibold transition ${
+                              opsPanel === p.id
+                                ? 'bg-[#0F3D2E] text-[#FAFCFB]'
+                                : 'border border-[#0F3D2E]/10 bg-[#FAFCFB] text-[#0F3D2E] hover:bg-[#0F3D2E]/[0.06]'
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                      {opsPanel === 'flags' ? (
+                        <AcaEnrollmentFlagsPanel
+                          flags={acaFlags}
+                          onChange={setAcaFlags}
+                          onFlash={setFlash}
+                        />
+                      ) : (
+                        <AcaStateLicensingPanel
+                          states={acaStates}
+                          onChange={setAcaStates}
+                          onFlash={setFlash}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {workspace === 'ledger' && (
+                    <div className="p-4 sm:p-5">
+                      <LedgerTable rows={ledger} note={ledgerNote} />
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+        </div>
       </div>
     </main>
   )
@@ -756,11 +769,7 @@ function OverviewPanel({
   applications: Application[]
   careers: Career[]
 }) {
-  return (
-    <div className="space-y-6">
-      <OfficeCalendar applications={applications} careers={careers} />
-    </div>
-  )
+  return <OfficeCalendar applications={applications} careers={careers} />
 }
 
 function OfficeCalendar({
@@ -828,44 +837,50 @@ function OfficeCalendar({
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
 
   return (
-    <div className={`${cardClass} !p-0 overflow-hidden`}>
+    <div className="overflow-hidden bg-[#FAFCFB]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-5 py-4">
         <div>
           <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-[#C9A961]">
             Calendar
           </p>
-          <h2 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.45rem' }}>
-            {monthNames[month]} {year}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Previous month"
-            onClick={() => setCursor(new Date(year, month - 1, 1))}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] font-sans text-[0.875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const now = new Date()
-              setCursor(new Date(now.getFullYear(), now.getMonth(), 1))
-              setSelectedDay(now.getDate())
-            }}
-            className="rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={() => setCursor(new Date(year, month + 1, 1))}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] font-sans text-[0.875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E] hover:text-[#FAFCFB]"
-          >
-            ›
-          </button>
+          <div className="mt-1 flex flex-wrap items-baseline gap-3">
+            <h2 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.45rem' }}>
+              {monthNames[month]} {year}
+            </h2>
+            <div className="flex items-center gap-2 font-sans text-[0.75rem] font-semibold">
+              <button
+                type="button"
+                onClick={() => setCursor(new Date(year, month - 1, 1))}
+                className="text-[#55655D] transition hover:text-[#0F3D2E]"
+              >
+                Prev
+              </button>
+              <span className="text-[#B89A78]" aria-hidden>
+                ·
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date()
+                  setCursor(new Date(now.getFullYear(), now.getMonth(), 1))
+                  setSelectedDay(now.getDate())
+                }}
+                className="text-[#55655D] transition hover:text-[#0F3D2E]"
+              >
+                Today
+              </button>
+              <span className="text-[#B89A78]" aria-hidden>
+                ·
+              </span>
+              <button
+                type="button"
+                onClick={() => setCursor(new Date(year, month + 1, 1))}
+                className="text-[#55655D] transition hover:text-[#0F3D2E]"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1041,7 +1056,7 @@ function FilesWorkspace({
   ]
 
   return (
-    <div className="overflow-hidden rounded-[20px] border border-[#0F3D2E]/10 bg-[#FAFCFB] shadow-[0_4px_20px_rgba(15,61,46,0.05)]">
+    <div className="overflow-hidden bg-[#FAFCFB]">
       <div className="flex flex-wrap items-center gap-2.5 border-b border-[#0F3D2E]/10 bg-[linear-gradient(135deg,#F7F3EE_0%,#EFE8DF_100%)] px-4 py-3">
         <div className="mr-1 hidden min-w-0 shrink-0 sm:block">
           <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
@@ -1311,79 +1326,117 @@ function ApplicationDetail({
  * ------------------------------------------------------------------------- */
 
 function EmployeesWorkspace({
-  panel,
-  onPanel,
   careers,
   listings,
   hiringStats,
-  sales,
   onUpdateCareer,
   onListingsChange,
   onFlash,
 }: {
-  panel: EmployeePanelId
-  onPanel: (p: EmployeePanelId) => void
   careers: Career[]
   listings: CareerListingRow[]
   hiringStats: Record<string, number>
-  sales: {
-    bySource: Record<string, number>
-    byStatus: Record<string, number>
-    byState: Record<string, number>
-    last7: number
-    conversion: number
-    enrolled: number
-  }
   onUpdateCareer: (id: string, status: string) => void | Promise<void>
   onListingsChange: (rows: CareerListingRow[]) => void
   onFlash: (msg: string | null) => void
 }) {
-  const tabs: { id: EmployeePanelId; label: string }[] = [
-    { id: 'overview', label: 'Workforce overview' },
-    { id: 'hiring', label: 'Hiring pipeline' },
-    { id: 'job-board', label: 'Careers page' },
-    { id: 'sales', label: 'Sales & marketing' },
-  ]
+  const [view, setView] = useState<WorkforceView>('directory')
+  const [profileQuery, setProfileQuery] = useState('')
+
+  const profiles = useMemo(() => {
+    const q = profileQuery.trim().toLowerCase()
+    if (!q) return careers
+    return careers.filter((c) => {
+      const hay = [
+        c.first_name,
+        c.last_name,
+        c.email,
+        c.phone,
+        c.position,
+        c.location,
+        c.status,
+        c.work_authorization,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  }, [careers, profileQuery])
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-        <button
-          type="button"
-          onClick={() => onPanel('hiring')}
-          className="group flex flex-col items-start rounded-[16px] border border-[#0F3D2E]/10 bg-[#FAFCFB] p-3.5 text-left shadow-[0_4px_16px_rgba(15,61,46,0.05)] transition hover:-translate-y-0.5 hover:border-[#0F3D2E]/25"
-        >
-          <span className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-[#1a4d38] text-[0.6875rem] font-bold text-white">
-            CM
-          </span>
-          <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">Hiring pipeline</span>
-          <span className="mt-0.5 font-sans text-[0.6875rem] text-[#55655D]">
-            {careers.length} career apps
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onPanel('job-board')}
-          className="group flex flex-col items-start rounded-[16px] border border-[#0F3D2E]/10 bg-[#FAFCFB] p-3.5 text-left shadow-[0_4px_16px_rgba(15,61,46,0.05)] transition hover:-translate-y-0.5 hover:border-[#0F3D2E]/25"
-        >
-          <span className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-[#2F6B52] text-[0.6875rem] font-bold text-white">
-            CM
-          </span>
-          <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">Job board</span>
-          <span className="mt-0.5 font-sans text-[0.6875rem] text-[#55655D]">
-            {listings.filter((l) => l.published).length} live roles
-          </span>
-        </button>
+      <div className={cardClass}>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Workforce
+            </p>
+            <h2 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.35rem' }}>
+              Hiring pulse
+            </h2>
+          </div>
+          <input
+            value={profileQuery}
+            onChange={(e) => {
+              setProfileQuery(e.target.value)
+              setView('directory')
+            }}
+            placeholder="Search employee profiles…"
+            className="w-full max-w-sm rounded-[12px] border border-[#0F3D2E]/15 bg-[#F7F3EE] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-72"
+          />
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: 'Pipeline', value: careers.length },
+            { label: 'New', value: hiringStats.new ?? 0 },
+            { label: 'Interview+', value: (hiringStats.interview ?? 0) + (hiringStats.offer ?? 0) },
+            { label: 'Hired', value: hiringStats.hired ?? 0 },
+          ].map((s) => (
+            <div key={s.label} className="rounded-[14px] bg-[#FAFCFB] px-3 py-3">
+              <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+                {s.label}
+              </p>
+              <p className="m-0 mt-1 font-sans text-[1.6rem] font-semibold text-[#0F3D2E]">
+                {s.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5">
+          <p className="mb-2 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
+            Application stages
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {CAREER_STATUSES.map((s) => (
+              <span
+                key={s}
+                className="inline-flex items-center gap-2 rounded-full bg-[#F4F1EC] px-3 py-1.5 font-sans text-[0.75rem] text-[#0F3D2E]"
+              >
+                {s.replace(/_/g, ' ')}
+                <strong>{hiringStats[s] ?? 0}</strong>
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {tabs.map((t) => (
+        {(
+          [
+            { id: 'directory' as const, label: 'Profiles' },
+            { id: 'hiring' as const, label: 'Applications' },
+            { id: 'job-board' as const, label: 'Hire' },
+          ] as const
+        ).map((t) => (
           <button
             key={t.id}
             type="button"
-            onClick={() => onPanel(t.id)}
+            onClick={() => setView(t.id)}
             className={`rounded-full px-4 py-2 font-sans text-[0.8125rem] font-semibold transition ${
-              panel === t.id
+              view === t.id
                 ? 'bg-[#0F3D2E] text-white'
                 : 'bg-white text-[#0F3D2E] hover:bg-[#0F3D2E]/[0.06]'
             }`}
@@ -1393,76 +1446,83 @@ function EmployeesWorkspace({
         ))}
       </div>
 
-      {panel === 'overview' && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className={`${cardClass} lg:col-span-2`}>
-            <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-              Business intelligence
-            </p>
-            <h2 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.35rem' }}>
-              Hiring & growth pulse
-            </h2>
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { label: 'Pipeline', value: careers.length },
-                { label: 'New', value: hiringStats.new ?? 0 },
-                { label: 'Interview+', value: (hiringStats.interview ?? 0) + (hiringStats.offer ?? 0) },
-                { label: 'Hired', value: hiringStats.hired ?? 0 },
-              ].map((s) => (
-                <div key={s.label} className="rounded-[14px] bg-[#FAFCFB] px-3 py-3">
-                  <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
-                    {s.label}
-                  </p>
-                  <p className="m-0 mt-1 font-sans text-[1.6rem] font-semibold text-[#0F3D2E]">
-                    {s.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-5">
-              <p className="mb-2 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
-                Pipeline stages
+      {view === 'directory' && (
+        <div className="space-y-3">
+          {profiles.length === 0 ? (
+            <div className={cardClass}>
+              <p className="m-0 font-sans text-[0.875rem] text-[#55655D]">
+                {profileQuery.trim()
+                  ? 'No employee profiles match that search.'
+                  : 'No employee profiles yet. Career applications appear here as people apply.'}
               </p>
-              <div className="flex flex-wrap gap-2">
-                {CAREER_STATUSES.map((s) => (
-                  <span
-                    key={s}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#F4F1EC] px-3 py-1.5 font-sans text-[0.75rem] text-[#0F3D2E]"
-                  >
-                    {s.replace(/_/g, ' ')}
-                    <strong>{hiringStats[s] ?? 0}</strong>
-                  </span>
-                ))}
-              </div>
             </div>
-          </div>
-
-          <div className={cardClass}>
-            <h3 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.1rem' }}>
-              Sales this week
-            </h3>
-            <p className="m-0 mt-3 font-sans text-[2.4rem] font-semibold leading-none text-[#0F3D2E]">
-              {sales.last7}
-            </p>
-            <p className="m-0 mt-2 font-sans text-[0.8125rem] text-[#55655D]">
-              New applications · {sales.conversion}% enroll conversion overall
-            </p>
-            <button
-              type="button"
-              onClick={() => onPanel('sales')}
-              className="mt-5 w-full rounded-[12px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.8125rem] font-semibold text-white"
-            >
-              Open sales desk
-            </button>
-          </div>
+          ) : (
+            profiles.map((c) => (
+              <div key={c.id} className={cardClass}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="m-0 font-sans text-[0.9375rem] font-semibold text-[#0F3D2E]">
+                        {c.first_name} {c.last_name}
+                      </p>
+                      {statusBadge(c.status)}
+                      <span className="inline-flex rounded-full bg-[#0F3D2E]/[0.06] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E]">
+                        {c.position}
+                      </span>
+                    </div>
+                    <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
+                      {c.email}
+                      {c.phone ? ` · ${c.phone}` : ''}
+                      {c.location ? ` · ${c.location}` : ''}
+                    </p>
+                    <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#55655D]/80">
+                      Applied {fmtDate(c.created_at)}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-3">
+                      {c.linkedin_url ? (
+                        <a
+                          href={c.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
+                        >
+                          LinkedIn
+                        </a>
+                      ) : null}
+                      {c.portfolio_url ? (
+                        <a
+                          href={c.portfolio_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
+                        >
+                          Portfolio / Resume
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                  <select
+                    value={c.status}
+                    onChange={(e) => void onUpdateCareer(c.id, e.target.value)}
+                    className={selectClass}
+                  >
+                    {CAREER_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
-      {panel === 'hiring' && <CareersTable rows={careers} onUpdateStatus={onUpdateCareer} />}
-      {panel === 'job-board' && (
+      {view === 'hiring' && <CareersTable rows={careers} onUpdateStatus={onUpdateCareer} />}
+      {view === 'job-board' && (
         <JobBoardEditor rows={listings} onChange={onListingsChange} onFlash={onFlash} />
       )}
-      {panel === 'sales' && <SalesMarketingPanel sales={sales} />}
     </div>
   )
 }
@@ -1795,7 +1855,7 @@ function JobBoardEditor({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="m-0 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-              Careers page editor
+              Hire editor
             </p>
             <h2
               className="m-0 mt-1 font-medium text-[#0F3D2E]"
