@@ -15,7 +15,11 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const patchSchema = z.object({
-  key: z.enum([ACA_FLAG_KEYS.OEP, ACA_FLAG_KEYS.SEP]),
+  key: z.enum([
+    ACA_FLAG_KEYS.OEP,
+    ACA_FLAG_KEYS.SEP,
+    ACA_FLAG_KEYS.FORCE_NEXT_MONTH_START,
+  ]),
   enabled: z.boolean().optional(),
   start_date: z
     .string()
@@ -44,7 +48,7 @@ export async function GET() {
         active:
           f.key === ACA_FLAG_KEYS.OEP
             ? evaluateOepActive(f)
-            : f.key === ACA_FLAG_KEYS.SEP
+            : f.key === ACA_FLAG_KEYS.SEP || f.key === ACA_FLAG_KEYS.FORCE_NEXT_MONTH_START
               ? evaluateSepActive(f)
               : false,
       })),

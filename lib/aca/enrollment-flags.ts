@@ -15,7 +15,30 @@ export type AcaEnrollmentFlag = {
 export const ACA_FLAG_KEYS = {
   OEP: 'ACA_OEP_ENABLED',
   SEP: 'ACA_SEP_ENABLED',
+  FORCE_NEXT_MONTH_START: 'ACA_FORCE_NEXT_MONTH_START',
 } as const
+
+/** First calendar day of next month in America/Chicago, as YYYY-MM-DD. */
+export function firstOfNextMonthIso(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const year = Number(parts.find((p) => p.type === 'year')?.value)
+  const month = Number(parts.find((p) => p.type === 'month')?.value)
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  return `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+}
+
+export async function isACAForceNextMonthStartEnabled(): Promise<boolean> {
+  const flag = await getFlagByKey(ACA_FLAG_KEYS.FORCE_NEXT_MONTH_START)
+  // Default ON if the flag row is missing (fail closed to the business rule).
+  if (!flag) return true
+  return Boolean(flag.enabled)
+}
 
 function todayIsoDate(now = new Date()): string {
   // Evaluate in America/Chicago (Centuries Mutual HQ) for marketplace windows.
@@ -84,11 +107,16 @@ export async function getAcaEnrollmentAvailability(now = new Date()) {
   const flags = await listAcaEnrollmentFlags()
   const oep = flags.find((f) => f.key === ACA_FLAG_KEYS.OEP) ?? null
   const sep = flags.find((f) => f.key === ACA_FLAG_KEYS.SEP) ?? null
+  const forceNext = flags.find((f) => f.key === ACA_FLAG_KEYS.FORCE_NEXT_MONTH_START) ?? null
+  const forceNextMonthStart = forceNext ? Boolean(forceNext.enabled) : true
   return {
     flags,
     openEnrollmentActive: oep ? evaluateOepActive(oep, now) : false,
     specialEnrollmentEnabled: sep ? evaluateSepActive(sep) : false,
+    forceNextMonthStart,
+    coverageStartDate: forceNextMonthStart ? firstOfNextMonthIso(now) : null,
     oep,
     sep,
+    forceNext,
   }
 }

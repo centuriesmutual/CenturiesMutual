@@ -19,8 +19,22 @@ type AcaConfig = {
   openEnrollmentActive: boolean
   specialEnrollmentEnabled: boolean
   anyEnrollmentPathOpen: boolean
+  forceNextMonthStart: boolean
+  coverageStartDate: string | null
+  sessionTtlMs: number
   availableStates: { code: string; name: string }[]
   states: { code: string; name: string; available: boolean }[]
+}
+
+const SESSION_KEY = 'cm-aca-enroll-session'
+const SESSION_TTL_MS = 10 * 60 * 1000
+
+function formatIncomeDisplay(raw: string) {
+  const digits = raw.replace(/[^\d]/g, '')
+  if (!digits) return ''
+  const n = Number(digits)
+  if (!Number.isFinite(n)) return ''
+  return `$${n.toLocaleString('en-US')}`
 }
 
 // 2025 federal poverty guidelines (48 contiguous states + DC), annual, USD.
@@ -105,6 +119,7 @@ export function AcaEnrollment() {
   const [done, setDone] = useState<string | null>(null)
   const [config, setConfig] = useState<AcaConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   // Step 0 — declarations
   const [enrollmentPeriod, setEnrollmentPeriod] = useState<'open' | 'sep' | ''>('')
@@ -120,6 +135,75 @@ export function AcaEnrollment() {
     citizenship: 'U.S. citizen', tobacco: 'No',
   })
 
+  // Step 2 — household & income
+  const [household, setHousehold] = useState({
+    household_size: '1', annual_income: '', filing_status: 'Single',
+    current_coverage: 'None', coverage_start: '',
+  })
+  const [dependents, setDependents] = useState<Dependent[]>([])
+
+  // Step 3 — sign
+  const [signature, setSignature] = useState('')
+  const [finalAgree, setFinalAgree] = useState(false)
+
+  useEffect(() => {
+    // Start / resume a 10-minute enrollment session.
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY)
+      const now = Date.now()
+      if (raw) {
+        const started = Number(raw)
+        if (Number.isFinite(started) && now - started > SESSION_TTL_MS) {
+          sessionStorage.removeItem(SESSION_KEY)
+          setSessionExpired(true)
+        }
+      } else {
+        sessionStorage.setItem(SESSION_KEY, String(now))
+      }
+    } catch {
+      // sessionStorage unavailable
+    }
+
+    const tick = window.setInterval(() => {
+      try {
+        const started = Number(sessionStorage.getItem(SESSION_KEY) || '0')
+        if (started && Date.now() - started > SESSION_TTL_MS) {
+          setSessionExpired(true)
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 15_000)
+
+    return () => window.clearInterval(tick)
+  }, [])
+
+  useEffect(() => {
+    if (done || sessionExpired) return
+    const dirty =
+      Boolean(enrollmentPeriod) ||
+      Boolean(applicant.first_name) ||
+      Boolean(applicant.email) ||
+      Boolean(household.annual_income) ||
+      Boolean(signature)
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirty) return
+      e.preventDefault()
+      e.returnValue = 'Your enrollment progress will be lost if you leave or refresh this page.'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [
+    done,
+    sessionExpired,
+    enrollmentPeriod,
+    applicant.first_name,
+    applicant.email,
+    household.annual_income,
+    signature,
+  ])
+
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -134,16 +218,21 @@ export function AcaEnrollment() {
           openEnrollmentActive: Boolean(data.openEnrollmentActive),
           specialEnrollmentEnabled: Boolean(data.specialEnrollmentEnabled),
           anyEnrollmentPathOpen: Boolean(data.anyEnrollmentPathOpen),
+          forceNextMonthStart: data.forceNextMonthStart !== false,
+          coverageStartDate: typeof data.coverageStartDate === 'string' ? data.coverageStartDate : null,
+          sessionTtlMs: typeof data.sessionTtlMs === 'number' ? data.sessionTtlMs : SESSION_TTL_MS,
           availableStates: Array.isArray(data.availableStates) ? data.availableStates : [],
           states: Array.isArray(data.states) ? data.states : [],
         }
         setConfig(next)
-        // Default to first available state when present.
+        if (next.forceNextMonthStart && next.coverageStartDate) {
+          setHousehold((h) => ({ ...h, coverage_start: next.coverageStartDate! }))
+        }
         if (next.availableStates[0]?.code) {
           setApplicant((a) => (a.state ? a : { ...a, state: next.availableStates[0].code }))
         }
       } catch {
-        // leave config null — form will show unavailable messaging
+        // leave config null
       } finally {
         if (active) setConfigLoading(false)
       }
@@ -164,17 +253,6 @@ export function AcaEnrollment() {
     }
   }, [config, enrollmentPeriod])
 
-  // Step 2 — household & income
-  const [household, setHousehold] = useState({
-    household_size: '1', annual_income: '', filing_status: 'Single',
-    current_coverage: 'None', coverage_start: '',
-  })
-  const [dependents, setDependents] = useState<Dependent[]>([])
-
-  // Step 3 — sign
-  const [signature, setSignature] = useState('')
-  const [finalAgree, setFinalAgree] = useState(false)
-
   const householdSizeNum = Math.max(1, parseInt(household.household_size || '1', 10) || 1)
   const fpl = useMemo(() => fplFor(householdSizeNum), [householdSizeNum])
 
@@ -190,8 +268,41 @@ export function AcaEnrollment() {
   }
   const setHouseholdField = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    setHousehold((p) => ({ ...p, [name]: value }))
+    const v = name === 'annual_income' ? formatIncomeDisplay(value) : value
+    setHousehold((p) => ({ ...p, [name]: v }))
     setError(null)
+  }
+
+  const restartSession = () => {
+    try {
+      sessionStorage.setItem(SESSION_KEY, String(Date.now()))
+    } catch {
+      /* ignore */
+    }
+    setSessionExpired(false)
+    setStep(0)
+    setError(null)
+    setDone(null)
+    setEnrollmentPeriod('')
+    setSepEvent('')
+    setSepEventDate('')
+    setSepAttested(false)
+    setDisclosuresAccepted(false)
+    setApplicant({
+      first_name: '', middle_initial: '', last_name: '', date_of_birth: '', ssn: '', sex: '',
+      phone: '', email: '', address: '', apt: '', city: '', state: config?.availableStates[0]?.code || '',
+      zip: '', county: '', citizenship: 'U.S. citizen', tobacco: 'No',
+    })
+    setHousehold({
+      household_size: '1',
+      annual_income: '',
+      filing_status: 'Single',
+      current_coverage: 'None',
+      coverage_start: config?.forceNextMonthStart && config.coverageStartDate ? config.coverageStartDate : '',
+    })
+    setDependents([])
+    setSignature('')
+    setFinalAgree(false)
   }
 
   const validateDeclarations = (): string | null => {
@@ -297,6 +408,11 @@ export function AcaEnrollment() {
         return
       }
       setDone(data.id ?? 'submitted')
+      try {
+        sessionStorage.removeItem(SESSION_KEY)
+      } catch {
+        /* ignore */
+      }
     } catch {
       setError('A network error occurred. Please try again.')
       setSubmitting(false)
@@ -311,6 +427,26 @@ export function AcaEnrollment() {
           <div className="mx-auto max-w-3xl">
             {done ? (
               <SuccessCard id={done} />
+            ) : sessionExpired ? (
+              <div className="rounded-2xl border border-[#14432A]/10 bg-white p-6 shadow-sm sm:p-8">
+                <h2
+                  className="m-0 font-medium text-[#14432A]"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 'clamp(1.35rem,3vw,1.9rem)' }}
+                >
+                  Enrollment session expired
+                </h2>
+                <p className="mt-3 font-sans text-[0.9375rem] leading-relaxed text-[#55655D]">
+                  For your security, enrollment sessions last 10 minutes. Start a new session to continue — previous
+                  answers were not saved.
+                </p>
+                <button
+                  type="button"
+                  onClick={restartSession}
+                  className="mt-5 rounded-[10px] bg-[#0F3D2E] px-5 py-2.5 font-sans text-[0.875rem] font-semibold text-white"
+                >
+                  Start new session
+                </button>
+              </div>
             ) : configLoading ? (
               <p className="font-sans text-[0.9375rem] text-[#55655D]">Loading enrollment options…</p>
             ) : (
@@ -367,7 +503,17 @@ export function AcaEnrollment() {
                           <input type="date" name="date_of_birth" value={applicant.date_of_birth} onChange={setApplicantField} className={fieldClass} />
                         </Field>
                         <Field label="Social Security number" className="sm:col-span-2">
-                          <input name="ssn" inputMode="numeric" value={applicant.ssn} onChange={setApplicantField} className={fieldClass} placeholder="XXX-XX-XXXX" />
+                          <input
+                            name="ssn"
+                            type="password"
+                            autoComplete="off"
+                            inputMode="numeric"
+                            value={applicant.ssn}
+                            onChange={setApplicantField}
+                            className={fieldClass}
+                            placeholder="•••-••-••••"
+                            aria-label="Social Security number (hidden while typing)"
+                          />
                         </Field>
                         <Field label="Sex (legal)" className="sm:col-span-2">
                           <select name="sex" value={applicant.sex} onChange={setApplicantField} className={fieldClass}>
@@ -441,7 +587,14 @@ export function AcaEnrollment() {
                           <input name="household_size" inputMode="numeric" value={household.household_size} onChange={setHouseholdField} className={fieldClass} />
                         </Field>
                         <Field label="Estimated annual household income" className="sm:col-span-2">
-                          <input name="annual_income" inputMode="numeric" value={household.annual_income} onChange={setHouseholdField} className={fieldClass} placeholder="$" />
+                          <input
+                            name="annual_income"
+                            inputMode="numeric"
+                            value={household.annual_income}
+                            onChange={setHouseholdField}
+                            className={fieldClass}
+                            placeholder="$0"
+                          />
                         </Field>
                         <Field label="Tax filing status" className="sm:col-span-2">
                           <select name="filing_status" value={household.filing_status} onChange={setHouseholdField} className={fieldClass}>
@@ -451,8 +604,23 @@ export function AcaEnrollment() {
                             <option>Head of household</option>
                           </select>
                         </Field>
-                        <Field label="Requested coverage start" className="sm:col-span-3">
-                          <input type="date" name="coverage_start" value={household.coverage_start} onChange={setHouseholdField} className={fieldClass} />
+                        <Field label="Coverage start date" className="sm:col-span-3">
+                          {config?.forceNextMonthStart ? (
+                            <div>
+                              <input
+                                type="date"
+                                name="coverage_start"
+                                value={household.coverage_start}
+                                readOnly
+                                className={`${fieldClass} bg-[#F3F6F4]`}
+                              />
+                              <p className="mt-1.5 m-0 font-sans text-[0.75rem] text-[#55655D]">
+                                Coverage begins on the first of next month ({household.coverage_start || '—'}).
+                              </p>
+                            </div>
+                          ) : (
+                            <input type="date" name="coverage_start" value={household.coverage_start} onChange={setHouseholdField} className={fieldClass} />
+                          )}
                         </Field>
                         <Field label="Current coverage" className="sm:col-span-3">
                           <select name="current_coverage" value={household.current_coverage} onChange={setHouseholdField} className={fieldClass}>

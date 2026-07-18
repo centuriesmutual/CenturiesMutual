@@ -33,6 +33,7 @@ const migrations = [
   '20260717000000_public_aca_enrollment.sql',
   '20260718000000_career_listings.sql',
   '20260719000000_aca_enrollment_flags.sql',
+  '20260720000000_aca_enroll_next_month_rate.sql',
 ]
 
 const rawConnectionString =

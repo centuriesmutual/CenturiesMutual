@@ -22,6 +22,9 @@ export async function GET() {
       ok: true,
       openEnrollmentActive: availability.openEnrollmentActive,
       specialEnrollmentEnabled: availability.specialEnrollmentEnabled,
+      forceNextMonthStart: availability.forceNextMonthStart,
+      coverageStartDate: availability.coverageStartDate,
+      sessionTtlMs: 10 * 60 * 1000,
       oep: availability.oep
         ? {
             enabled: availability.oep.enabled,
@@ -40,7 +43,6 @@ export async function GET() {
         code: s.state_code,
         name: s.state_name,
       })),
-      // Full list for messaging / disabled options (codes only + availability).
       states: allStates.map((s) => ({
         code: s.state_code,
         name: s.state_name,

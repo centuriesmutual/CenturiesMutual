@@ -130,9 +130,9 @@ export function CommunityHero() {
                 </h2>
                 <p className="mb-6 text-center font-sans text-[0.875rem] leading-[1.65] text-[#3d4a41] sm:text-[0.9375rem]">
                   A member-owned network where health coverage, everyday savings,
-                  and community rewards compound into lasting value — built to
-                  protect your family today and help grow what you pass on for
-                  generations to come.
+                  and community rewards build lasting value — designed to protect
+                  your family today and help grow what you pass on for generations
+                  to come.
                 </p>
                 <div className="flex w-full flex-wrap items-center justify-center gap-2.5 sm:flex-nowrap">
                   <Link

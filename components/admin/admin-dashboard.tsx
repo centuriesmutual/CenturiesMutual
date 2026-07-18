@@ -146,6 +146,27 @@ function fmtDate(iso?: string | null) {
   })
 }
 
+function parseEnrollmentNotes(notes: string | null | undefined) {
+  if (!notes) return null
+  try {
+    const parsed = JSON.parse(notes) as {
+      enrollment_period?: string
+      household?: {
+        size?: number
+        annual_income?: number
+        coverage_start?: string
+        filing_status?: string
+      }
+      sep?: { qualifying_event?: string | null; event_date?: string | null }
+      applicant?: { ssn_last4?: string }
+    }
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 function statusBadge(status: string) {
   const map: Record<string, string> = {
     submitted: 'bg-[#C9A53E]/15 text-[#8a6d16]',
@@ -498,11 +519,46 @@ function ApplicationsTable({
                 Submitted {fmtDate(a.created_at)}
                 {a.date_of_birth ? ` · DOB ${a.date_of_birth}` : ''}
               </p>
-              {a.notes ? (
-                <p className="m-0 mt-2 rounded-[8px] bg-[#F4F1EC] px-3 py-2 font-sans text-[0.8125rem] text-[#55655D]">
-                  {a.notes}
-                </p>
-              ) : null}
+              {(() => {
+                const detail = parseEnrollmentNotes(a.notes)
+                if (detail) {
+                  return (
+                    <div className="mt-2 rounded-[8px] bg-[#F4F1EC] px-3 py-2 font-sans text-[0.8125rem] text-[#55655D]">
+                      <p className="m-0">
+                        {detail.enrollment_period
+                          ? `Period: ${detail.enrollment_period === 'sep' ? 'SEP' : 'Open Enrollment'}`
+                          : null}
+                        {detail.household?.coverage_start
+                          ? ` · Coverage start ${detail.household.coverage_start}`
+                          : ''}
+                        {typeof detail.household?.annual_income === 'number'
+                          ? ` · Income $${detail.household.annual_income.toLocaleString('en-US')}`
+                          : ''}
+                        {detail.household?.size
+                          ? ` · HH size ${detail.household.size}`
+                          : ''}
+                        {detail.applicant?.ssn_last4
+                          ? ` · SSN ****${detail.applicant.ssn_last4}`
+                          : ''}
+                      </p>
+                      {detail.sep?.qualifying_event ? (
+                        <p className="m-0 mt-1">
+                          SEP: {detail.sep.qualifying_event}
+                          {detail.sep.event_date ? ` (${detail.sep.event_date})` : ''}
+                        </p>
+                      ) : null}
+                    </div>
+                  )
+                }
+                if (a.notes) {
+                  return (
+                    <p className="m-0 mt-2 rounded-[8px] bg-[#F4F1EC] px-3 py-2 font-sans text-[0.8125rem] text-[#55655D]">
+                      {a.notes}
+                    </p>
+                  )
+                }
+                return null
+              })()}
             </div>
             <select
               value={a.application_status}
