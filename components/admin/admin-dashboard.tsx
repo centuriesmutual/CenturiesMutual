@@ -1499,6 +1499,7 @@ function ClientsDirectoryPanel({
     'First name',
     'Last name',
     'Email',
+    'Phone number',
     'Date of birth',
     'Plan type',
     'Status',
@@ -1524,6 +1525,8 @@ function ClientsDirectoryPanel({
           return { label, value: selected.last_name || '' }
         case 'Email':
           return { label, value: selected.email || '', warning: duplicateEmailWarning }
+        case 'Phone number':
+          return { label, value: selected.phone || '', warning: duplicatePhoneWarning }
         case 'Date of birth':
           return { label, value: selected.date_of_birth || '' }
         case 'Plan type':
@@ -1619,8 +1622,28 @@ function ClientsDirectoryPanel({
           <div className="grid min-h-0 shrink grid-cols-1 content-start gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
             {fields.map((f) => (
               <label key={f.label} className="block">
-                <span className="mb-1 flex items-center font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                <span className="mb-1 flex items-center gap-1 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
                   {f.label}
+                  {f.label === 'Phone number' ? (
+                    <button
+                      type="button"
+                      disabled={!selected?.phone}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (!selected?.phone) return
+                        setCallTarget({
+                          applicationId: selected.id,
+                          name: `${selected.first_name} ${selected.last_name}`.trim(),
+                          phone: selected.phone,
+                          context: 'Clients',
+                        })
+                      }}
+                      title={selected?.phone ? `Call ${selected.phone}` : 'No phone on file'}
+                      className="inline-flex items-center justify-center border-0 bg-transparent p-0 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-35"
+                    >
+                      <Phone className="h-3 w-3" strokeWidth={2.25} />
+                    </button>
+                  ) : null}
                   {f.warning ? <DuplicateFieldMark message={f.warning} /> : null}
                 </span>
                 <input
@@ -1698,35 +1721,7 @@ function ClientsDirectoryPanel({
                 ) : null}
               </button>
             ) : null}
-            <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
-              <div className="flex min-w-0 max-w-[14rem] flex-1 items-center gap-1.5 sm:max-w-[16rem]">
-                <button
-                  type="button"
-                  disabled={!selected?.phone}
-                  onClick={() => {
-                    if (!selected?.phone) return
-                    setCallTarget({
-                      applicationId: selected.id,
-                      name: `${selected.first_name} ${selected.last_name}`.trim(),
-                      phone: selected.phone,
-                      context: 'Clients',
-                    })
-                  }}
-                  title={selected?.phone ? `Call ${selected.phone}` : 'No phone on file'}
-                  className="inline-flex shrink-0 items-center justify-center border-0 bg-transparent p-0 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-35"
-                >
-                  <Phone className="h-3.5 w-3.5" strokeWidth={2.25} />
-                </button>
-                {duplicatePhoneWarning ? (
-                  <DuplicateFieldMark message={duplicatePhoneWarning} />
-                ) : null}
-                <input
-                  readOnly
-                  value={selected?.phone || ''}
-                  placeholder="—"
-                  className={`${selected ? filledFieldClass : emptyFieldClass} min-w-0 flex-1`}
-                />
-              </div>
+            <div className="mt-2 flex shrink-0 justify-end">
               <button
                 type="button"
                 disabled={
