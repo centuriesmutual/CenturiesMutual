@@ -57,16 +57,35 @@ const APPLICATION_STATUSES = [
   'active',
 ] as const
 
+const CAREER_STATUSES = [
+  'new',
+  'reviewing',
+  'interview',
+  'offer',
+  'hired',
+  'declined',
+  'archived',
+] as const
+
 const ENROLLED_STATUSES = new Set(['approved', 'active'])
 
-type TabId = 'applications' | 'enrollments' | 'careers' | 'ledger'
+type TabId = 'applications' | 'aca' | 'enrollments' | 'careers' | 'ledger'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'applications', label: 'Applications' },
+  { id: 'aca', label: 'ACA' },
   { id: 'enrollments', label: 'Enrollments' },
   { id: 'careers', label: 'Careers' },
   { id: 'ledger', label: 'Hyperledger Logs' },
 ]
+
+/** Marketplace/ACA submissions — from the public enrollment flow or tagged ACA. */
+function isAcaApplication(a: { plan_type: string | null; source: string | null }) {
+  return (
+    (a.plan_type ? /aca/i.test(a.plan_type) : false) ||
+    a.source === 'enrollment'
+  )
+}
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—'
@@ -90,6 +109,11 @@ function statusBadge(status: string) {
     active: 'bg-[#0F3D2E]/12 text-[#0F3D2E]',
     declined: 'bg-[#B42318]/12 text-[#B42318]',
     new: 'bg-[#C9A53E]/15 text-[#8a6d16]',
+    reviewing: 'bg-[#2563eb]/12 text-[#1d4ed8]',
+    interview: 'bg-[#0F3D2E]/12 text-[#0F3D2E]',
+    offer: 'bg-[#0F3D2E]/12 text-[#0F3D2E]',
+    hired: 'bg-[#0F3D2E]/12 text-[#0F3D2E]',
+    archived: 'bg-[#14432A]/10 text-[#55655D]',
   }
   const cls = map[status] ?? 'bg-[#14432A]/10 text-[#14432A]'
   return (
@@ -167,6 +191,11 @@ export function AdminDashboard({
     [applications],
   )
 
+  const acaApplications = useMemo(
+    () => applications.filter(isAcaApplication),
+    [applications],
+  )
+
   const updateStatus = async (id: string, application_status: string) => {
     setFlash(null)
     const res = await fetch('/api/admin/applications', {
@@ -183,6 +212,22 @@ export function AdminDashboard({
       prev.map((a) => (a.id === id ? { ...a, application_status } : a)),
     )
     setFlash('Status updated.')
+  }
+
+  const updateCareerStatus = async (id: string, status: string) => {
+    setFlash(null)
+    const res = await fetch('/api/admin/careers', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data?.ok) {
+      setFlash(data?.error || 'Could not update career status.')
+      return
+    }
+    setCareers((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)))
+    setFlash('Career application status updated.')
   }
 
   return (
@@ -224,9 +269,10 @@ export function AdminDashboard({
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {/* Summary stats */}
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
             { label: 'Applications', value: applications.length },
+            { label: 'ACA', value: acaApplications.length },
             { label: 'Enrollments', value: enrollments.length },
             { label: 'Careers', value: careers.length },
             { label: 'Ledger events', value: ledger.length },
@@ -275,18 +321,28 @@ export function AdminDashboard({
           <p className="font-sans text-[0.9375rem] text-[#55655D]">Loading…</p>
         ) : (
           <>
-            {(tab === 'applications' || tab === 'enrollments') && (
+            {(tab === 'applications' || tab === 'enrollments' || tab === 'aca') && (
               <ApplicationsTable
-                rows={tab === 'applications' ? applications : enrollments}
+                rows={
+                  tab === 'applications'
+                    ? applications
+                    : tab === 'aca'
+                      ? acaApplications
+                      : enrollments
+                }
                 onUpdateStatus={updateStatus}
                 emptyLabel={
                   tab === 'applications'
                     ? 'No application submissions yet.'
-                    : 'No active enrollments yet.'
+                    : tab === 'aca'
+                      ? 'No ACA / marketplace enrollments submitted yet.'
+                      : 'No active enrollments yet.'
                 }
               />
             )}
-            {tab === 'careers' && <CareersTable rows={careers} />}
+            {tab === 'careers' && (
+              <CareersTable rows={careers} onUpdateStatus={updateCareerStatus} />
+            )}
             {tab === 'ledger' && <LedgerTable rows={ledger} note={ledgerNote} />}
           </>
         )}
@@ -362,7 +418,13 @@ function ApplicationsTable({
   )
 }
 
-function CareersTable({ rows }: { rows: Career[] }) {
+function CareersTable({
+  rows,
+  onUpdateStatus,
+}: {
+  rows: Career[]
+  onUpdateStatus: (id: string, status: string) => void | Promise<void>
+}) {
   if (rows.length === 0) {
     return (
       <p className="font-sans text-[0.9375rem] text-[#55655D]">
@@ -374,51 +436,66 @@ function CareersTable({ rows }: { rows: Career[] }) {
     <div className="space-y-3">
       {rows.map((c) => (
         <div key={c.id} className={cardClass}>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="m-0 font-sans text-[0.9375rem] font-semibold text-[#14432A]">
-              {c.first_name} {c.last_name}
-            </p>
-            {statusBadge(c.status)}
-            <span className="inline-flex rounded-full bg-[#14432A]/[0.06] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#14432A]">
-              {c.position}
-            </span>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="m-0 font-sans text-[0.9375rem] font-semibold text-[#14432A]">
+                  {c.first_name} {c.last_name}
+                </p>
+                {statusBadge(c.status)}
+                <span className="inline-flex rounded-full bg-[#14432A]/[0.06] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#14432A]">
+                  {c.position}
+                </span>
+              </div>
+              <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
+                {c.email}
+                {c.phone ? ` · ${c.phone}` : ''}
+                {c.location ? ` · ${c.location}` : ''}
+                {c.work_authorization ? ` · ${c.work_authorization}` : ''}
+              </p>
+              <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#55655D]/80">
+                Applied {fmtDate(c.created_at)}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-3">
+                {c.linkedin_url ? (
+                  <a
+                    href={c.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
+                  >
+                    LinkedIn
+                  </a>
+                ) : null}
+                {c.portfolio_url ? (
+                  <a
+                    href={c.portfolio_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
+                  >
+                    Portfolio / Resume
+                  </a>
+                ) : null}
+              </div>
+              {c.cover_letter ? (
+                <p className="m-0 mt-2 whitespace-pre-wrap rounded-[8px] bg-[#F4F1EC] px-3 py-2 font-sans text-[0.8125rem] text-[#55655D]">
+                  {c.cover_letter}
+                </p>
+              ) : null}
+            </div>
+            <select
+              value={c.status}
+              onChange={(e) => void onUpdateStatus(c.id, e.target.value)}
+              className={selectClass}
+            >
+              {CAREER_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
           </div>
-          <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
-            {c.email}
-            {c.phone ? ` · ${c.phone}` : ''}
-            {c.location ? ` · ${c.location}` : ''}
-            {c.work_authorization ? ` · ${c.work_authorization}` : ''}
-          </p>
-          <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#55655D]/80">
-            Applied {fmtDate(c.created_at)}
-          </p>
-          <div className="mt-1 flex flex-wrap gap-3">
-            {c.linkedin_url ? (
-              <a
-                href={c.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
-              >
-                LinkedIn
-              </a>
-            ) : null}
-            {c.portfolio_url ? (
-              <a
-                href={c.portfolio_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
-              >
-                Portfolio / Resume
-              </a>
-            ) : null}
-          </div>
-          {c.cover_letter ? (
-            <p className="m-0 mt-2 rounded-[8px] bg-[#F4F1EC] px-3 py-2 font-sans text-[0.8125rem] text-[#55655D]">
-              {c.cover_letter}
-            </p>
-          ) : null}
         </div>
       ))}
     </div>
