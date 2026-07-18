@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Fraunces } from 'next/font/google'
-import { fadeUp } from '@/lib/animations'
+import { cardFloat, fadeUp, stagger } from '@/lib/animations'
 import { GRAIN_BG } from '@/components/layout/site-header'
 
 const editorial = Fraunces({
@@ -39,8 +39,6 @@ function TopoPattern({ className = '' }: { className?: string }) {
     </svg>
   )
 }
-
-const portalShadow = 'shadow-[0_8px_32px_-8px_rgba(0,0,0,0.25)]'
 
 export function CommunityHero() {
   return (
@@ -81,64 +79,77 @@ export function CommunityHero() {
           <TopoPattern className="pointer-events-none absolute bottom-0 left-0 z-[2] h-36 w-[min(100%,280px)] text-[#0F3D2E] opacity-[0.07] sm:h-48 sm:w-[min(100%,340px)]" />
 
           <motion.div
-            variants={fadeUp}
+            variants={stagger}
             initial="hidden"
             animate="show"
             className="relative z-[1] flex flex-1 flex-col justify-center px-5 py-7 sm:px-8 sm:py-8 lg:px-12 lg:py-12"
           >
-            <p className="mb-3 font-sans text-[10px] font-medium uppercase tracking-[0.25em] text-[#C9A961] sm:mb-4">
-              — Est. 2024
-            </p>
-
-            <div
-              className={`relative overflow-hidden rounded-2xl border border-[#E5E0D5] bg-[#F7F3EE] ${portalShadow}`}
+            <motion.p
+              variants={fadeUp}
+              className="mb-3 font-sans text-[10px] font-medium uppercase tracking-[0.28em] text-[#C9A961] sm:mb-4"
             >
-              <div className="relative z-[1] px-5 py-6 sm:px-8 sm:py-8">
-                <p className="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C9A961]">
+              — Est. 2024
+            </motion.p>
+
+            <motion.div
+              variants={cardFloat}
+              className="relative overflow-hidden rounded-2xl border border-white/40 bg-[#F7F3EE]/[0.96] shadow-[0_20px_50px_-20px_rgba(15,61,46,0.28),0_0_0_1px_rgba(201,169,97,0.12)] backdrop-blur-sm"
+            >
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_0%_0%,rgba(201,169,97,0.16)_0%,transparent_55%)]"
+              />
+              <TopoPattern className="pointer-events-none absolute -bottom-2 -right-2 z-[1] h-28 w-44 text-[#0F3D2E] opacity-[0.06] sm:h-32 sm:w-52" />
+
+              <div className="relative z-[2] px-6 py-7 sm:px-8 sm:py-8">
+                <p className="mb-2.5 text-center font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C9A961]">
                   Centuries Mutual
                 </p>
+
+                <div className="mx-auto mb-4 h-px w-12 bg-[#C9A961]/70" aria-hidden />
+
                 <h1
-                  className="mb-3 max-w-md text-center font-medium tracking-tight text-[#0F3D2E] mx-auto"
+                  className="mb-2 text-center font-medium tracking-tight text-[#0F3D2E]"
                   style={{
                     fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif',
-                    fontSize: 'clamp(1.55rem, 5.5vw, 2.35rem)',
-                    lineHeight: 1.18,
+                    fontSize: 'clamp(1.65rem, 5.2vw, 2.45rem)',
+                    lineHeight: 1.15,
                   }}
                 >
                   Your Community Brokerage
                 </h1>
                 <h2
-                  className="mb-3 text-center font-medium tracking-tight text-[#0F3D2E]"
+                  className="mb-4 text-center font-medium tracking-tight text-[#0F3D2E]/90"
                   style={{
                     fontFamily: 'var(--font-hero-editorial), Fraunces, Georgia, serif',
-                    fontSize: 'clamp(1.05rem, 3.4vw, 1.35rem)',
+                    fontSize: 'clamp(1.05rem, 3.2vw, 1.35rem)',
                     lineHeight: 1.3,
                   }}
                 >
                   The Common Wealth
                 </h2>
-                <p className="mb-3 max-w-md font-sans text-[0.875rem] leading-[1.6] text-[#3d4a41] sm:text-[0.9375rem]">
+                <p className="mb-6 text-center font-sans text-[0.875rem] leading-[1.65] text-[#3d4a41] sm:text-[0.9375rem]">
                   A member-owned network where health coverage, everyday savings,
                   and community rewards compound into lasting value — built to
                   protect your family today and help grow what you pass on for
                   generations to come.
                 </p>
-                <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:flex-nowrap">
+                <div className="flex w-full flex-wrap items-center justify-center gap-2.5 sm:flex-nowrap">
                   <Link
                     href="/createaccount"
-                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[#0F3D2E] bg-transparent px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] no-underline"
+                    className="inline-flex min-w-[8.5rem] shrink-0 items-center justify-center rounded-lg border border-[#0F3D2E] bg-transparent px-4 py-2.5 font-sans text-[0.8125rem] font-semibold tracking-[0.01em] text-[#0F3D2E] no-underline transition hover:bg-[#0F3D2E]/[0.06]"
                   >
                     Create Account
                   </Link>
                   <Link
                     href="/enroll"
-                    className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0F3D2E] px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] no-underline"
+                    className="inline-flex min-w-[8.5rem] shrink-0 items-center justify-center rounded-lg bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.8125rem] font-semibold tracking-[0.01em] text-[#FAFCFB] no-underline shadow-[0_8px_22px_-8px_rgba(15,61,46,0.55)] transition hover:bg-[#0A2E22]"
                   >
                     Enroll
                   </Link>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
       </div>
