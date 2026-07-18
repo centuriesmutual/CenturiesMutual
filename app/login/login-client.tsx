@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { clearSession, establishSession } from '@/lib/member-profile'
 import { signInAction } from '@/lib/supabase/auth-actions'
 import { createClient } from '@/lib/supabase/client'
+import { walletUrl } from '@/lib/site-urls'
 
 interface LoginFormData {
   email: string
@@ -90,7 +91,14 @@ export default function LoginClient() {
 
       establishSession(user.email)
       const next = searchParams.get('next')
-      router.replace(next && next.startsWith('/') ? next : '/wallet')
+      // Prefer an explicit same-origin `next`, otherwise land on the Wallet —
+      // its own subdomain in production (absolute URL => hard navigate).
+      const destination = next && next.startsWith('/') ? next : walletUrl()
+      if (/^https?:\/\//i.test(destination)) {
+        window.location.assign(destination)
+        return
+      }
+      router.replace(destination)
       router.refresh()
     } catch {
       setError('An error occurred during login. Please try again.')

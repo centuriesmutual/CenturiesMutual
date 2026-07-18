@@ -3,19 +3,35 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { createClient } from '@/lib/supabase/client'
 
 export default function CampaignLogin() {
   const router = useRouter()
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.email.trim() || !formData.password) {
-      setError('Please enter both email and password')
-      return
+    setError('')
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+      })
+      if (signInError || !data.user) {
+        setError('Invalid email or password.')
+        setLoading(false)
+        return
+      }
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      setError('Could not sign in. Please try again.')
+      setLoading(false)
     }
-    router.push('/dashboard')
   }
 
   return (
@@ -110,33 +126,18 @@ export default function CampaignLogin() {
 
             <div className="mb-5 flex items-center justify-between gap-3">
               <label className="flex items-center gap-2 font-sans text-[0.875rem] text-[#55655D]">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded accent-[#0F3D2E]"
-                />
+                <input type="checkbox" className="h-4 w-4 rounded accent-[#0F3D2E]" />
                 Remember me
               </label>
-              <a
-                href="#"
-                className="font-sans text-[0.8125rem] font-semibold text-[#C9A53E] hover:underline"
-              >
-                Forgot password?
-              </a>
             </div>
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] transition hover:bg-[#0A2E22]"
+              disabled={loading}
+              className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] transition hover:bg-[#0A2E22] disabled:opacity-60"
             >
-              Sign in
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
-
-            <p className="mt-5 text-center font-sans text-[0.875rem] text-[#55655D]">
-              Don&apos;t have an account?{' '}
-              <a href="#" className="font-semibold text-[#C9A53E] hover:underline">
-                Sign up
-              </a>
-            </p>
           </form>
         </div>
       </div>

@@ -19,7 +19,6 @@ import {
 import { TransactionHistory } from '@/components/dashboard/transaction-history'
 import { RewardsWalletSection } from '@/components/dashboard/rewards-wallet-section'
 import { EnrollmentWelcome } from '@/components/dashboard/enrollment-welcome'
-import { YoutubeExperience } from '@/components/dashboard/youtube-experience'
 import {
   MbkIntelligence,
   WintergardenIntelligence,
@@ -36,6 +35,7 @@ import {
   type MemberSession,
 } from '@/lib/member-profile'
 import { createClient } from '@/lib/supabase/client'
+import { adminUrl } from '@/lib/site-urls'
 import { loadLedger, appendLedgerEntry, type LedgerEntry } from '@/lib/wallet-ledger'
 import { saveLinkedAccount } from '@/lib/payout-links'
 import {
@@ -46,7 +46,6 @@ import {
 const REWARDS_BALANCE = 0
 
 type Tab =
-  | 'home'
   | 'wallet'
   | 'enrollment'
   | 'mbk'
@@ -217,13 +216,20 @@ export default function WalletDashboard() {
     persistProfile({ ...profile, plan })
     setEnrolling(false)
     setEnrollmentWelcome(false)
-    setTab('home')
+    setTab('wallet')
   }
 
   const openService = (id: ServiceFlowId) => {
     setSettingsOpen(false)
     setEnrolling(false)
     setTab(id)
+  }
+
+  const openEnrollment = () => {
+    setSettingsOpen(false)
+    setTab('enrollment')
+    setEnrolling(false)
+    setEnrollmentWelcome(!profile.plan)
   }
 
   const recordLedger = useCallback(
@@ -252,7 +258,7 @@ export default function WalletDashboard() {
   const isServiceTab = ACCOUNT_LINKS.some((l) => l.id === tab)
 
   return (
-    <div className={`flex min-h-dvh flex-col ${tab === 'home' ? 'bg-black' : 'bg-[#FAFCFB]'}`}>
+    <div className="flex min-h-dvh flex-col bg-[#FAFCFB]">
       <header className="sticky top-0 z-20 border-b border-[#14432A]/10 bg-[#0F3D2E]">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <button
@@ -294,7 +300,7 @@ export default function WalletDashboard() {
               title="Settings"
               onClick={() => setSettingsOpen((o) => !o)}
               className={`inline-flex items-center border-0 bg-transparent p-1 text-[#FAFCFB] transition ${
-                settingsOpen || tab === 'settings' || isServiceTab || tab === 'mbk' || tab === 'wintergarden' || tab === 'wallet' || tab === 'home'
+                settingsOpen || tab === 'settings' || isServiceTab || tab === 'mbk' || tab === 'wintergarden' || tab === 'wallet'
                   ? 'text-[#FAFCFB]'
                   : 'text-[#FAFCFB]/80 hover:text-[#FAFCFB]'
               }`}
@@ -315,15 +321,21 @@ export default function WalletDashboard() {
                   <button
                     type="button"
                     role="menuitem"
-                    onClick={() => {
-                      setSettingsOpen(false)
-                      setEnrolling(false)
-                      setTab('home')
-                    }}
+                    onClick={openEnrollment}
                     className="block w-full border-0 bg-transparent px-4 py-2 text-left font-sans text-[0.8125rem] font-medium text-[#14432A] transition hover:bg-[#14432A]/[0.06]"
                   >
-                    Youtube
+                    Enrollment
                   </button>
+                  <a
+                    role="menuitem"
+                    href="https://thriftmeds.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setSettingsOpen(false)}
+                    className="block w-full border-0 bg-transparent px-4 py-2 text-left font-sans text-[0.8125rem] font-medium text-[#14432A] no-underline transition hover:bg-[#14432A]/[0.06]"
+                  >
+                    Thrift Meds
+                  </a>
                   <div className="my-1.5 h-px bg-[#14432A]/10" />
                   <button
                     type="button"
@@ -379,20 +391,8 @@ export default function WalletDashboard() {
       </header>
 
       <div className="flex min-h-0 w-full flex-1 flex-col">
-        <main
-          className={`mx-auto w-full flex-1 ${
-            tab === 'home'
-              ? 'max-w-none bg-black px-0 py-0'
-              : 'max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8'
-          }`}
-        >
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <AnimatePresence mode="wait">
-            {tab === 'home' ? (
-              <motion.div key="home" {...panelMotion}>
-                <YoutubeExperience />
-              </motion.div>
-            ) : null}
-
             {tab === 'wallet' ? (
               <motion.div key="wallet" {...panelMotion}>
                 <div className="mb-1 flex items-center justify-between gap-3">
@@ -488,7 +488,7 @@ export default function WalletDashboard() {
               <motion.div key={tab} {...panelMotion}>
                 <ServiceFlow
                   id={tab as ServiceFlowId}
-                  onClose={() => setTab('home')}
+                  onClose={() => setTab('wallet')}
                   onSubmitted={recordLedger}
                 />
               </motion.div>
@@ -562,7 +562,7 @@ export default function WalletDashboard() {
                       onCancel={() => {
                         setEnrollmentWelcome(false)
                         setEnrolling(false)
-                        if (!profile.plan) setTab('home')
+                        if (!profile.plan) setTab('wallet')
                       }}
                     />
                   </div>
@@ -698,12 +698,12 @@ export default function WalletDashboard() {
                   >
                     <ArrowRightOnRectangleIcon className="h-4 w-4" /> Log out
                   </button>
-                  <Link
-                    href="/admin"
+                  <a
+                    href={adminUrl()}
                     className="inline-flex items-center gap-2 rounded-[10px] border border-[#14432A]/25 px-4 py-2 font-sans text-[0.8125rem] font-semibold text-[#14432A] no-underline"
                   >
                     Enrollment admin
-                  </Link>
+                  </a>
                 </div>
               </motion.div>
             ) : null}

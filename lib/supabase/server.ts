@@ -1,12 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/env'
+import {
+  getSupabaseAnonKey,
+  getSupabaseUrl,
+  supabaseCookieOptions,
+} from '@/lib/supabase/env'
 
 /** Server Component / Route Handler client with cookie session. */
 export function createClient() {
   const cookieStore = cookies()
 
   return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+    cookieOptions: supabaseCookieOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll()

@@ -178,7 +178,7 @@ export default function CreateAccountPage() {
     <>
       <SiteHeader />
       <main className="m-0 block overflow-hidden bg-transparent p-0">
-        <section className="flex h-[calc(100dvh-57px)] max-h-[calc(100dvh-57px)] items-center overflow-hidden bg-[#FAFCFB]">
+        <section className="flex h-[calc(100dvh-69px)] max-h-[calc(100dvh-69px)] items-center overflow-hidden bg-[#FAFCFB]">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             {success ? (
               <motion.div

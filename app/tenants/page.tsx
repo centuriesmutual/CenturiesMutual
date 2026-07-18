@@ -277,8 +277,8 @@ export default function Tenants() {
                     </div>
                   </li>
                 </ul>
-                <Link href="/rentalequity" className="btn btn-dark btn-lg">
-                  Learn about Rental Equity
+                <Link href="/pay" className="btn btn-dark btn-lg">
+                  Learn about Rent, Bills &amp; Groceries
                 </Link>
               </motion.div>
               <div className="col-lg-6">

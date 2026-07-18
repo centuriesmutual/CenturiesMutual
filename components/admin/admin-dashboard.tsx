@@ -69,15 +69,47 @@ const CAREER_STATUSES = [
 
 const ENROLLED_STATUSES = new Set(['approved', 'active'])
 
-type TabId = 'applications' | 'aca' | 'enrollments' | 'careers' | 'ledger'
+type CareerListingRow = {
+  id: string
+  title: string
+  department: string
+  employment_type: string
+  location: string
+  description: string
+  sort_order: number
+  published: boolean
+}
+
+type TabId = 'applications' | 'aca' | 'enrollments' | 'careers' | 'job-board' | 'ledger'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'applications', label: 'Applications' },
   { id: 'aca', label: 'ACA' },
   { id: 'enrollments', label: 'Enrollments' },
-  { id: 'careers', label: 'Careers' },
+  { id: 'careers', label: 'Career Apps' },
+  { id: 'job-board', label: 'Careers Page' },
   { id: 'ledger', label: 'Hyperledger Logs' },
 ]
+
+const DEPARTMENTS = [
+  'Insurance & Enrollment',
+  'Member Services',
+  'Engineering',
+  'Design',
+  'Data',
+  'Compliance',
+  'Operations',
+] as const
+
+const EMPTY_LISTING = {
+  title: '',
+  department: 'Insurance & Enrollment',
+  employment_type: 'Full-Time',
+  location: 'Remote — US',
+  description: '',
+  sort_order: 100,
+  published: true,
+}
 
 /** Marketplace/ACA submissions — from the public enrollment flow or tagged ACA. */
 function isAcaApplication(a: { plan_type: string | null; source: string | null }) {
@@ -138,6 +170,7 @@ export function AdminDashboard({
 
   const [applications, setApplications] = useState<Application[]>([])
   const [careers, setCareers] = useState<Career[]>([])
+  const [listings, setListings] = useState<CareerListingRow[]>([])
   const [ledger, setLedger] = useState<LedgerLog[]>([])
   const [ledgerNote, setLedgerNote] = useState<string | null>(null)
 
@@ -149,9 +182,10 @@ export function AdminDashboard({
     setLoading(true)
     setError(null)
     try {
-      const [appsRes, careersRes, ledgerRes] = await Promise.all([
+      const [appsRes, careersRes, listingsRes, ledgerRes] = await Promise.all([
         fetch('/api/admin/applications', { cache: 'no-store' }),
         fetch('/api/admin/careers', { cache: 'no-store' }),
+        fetch('/api/admin/career-listings', { cache: 'no-store' }),
         fetch('/api/admin/ledger-logs', { cache: 'no-store' }),
       ])
 
@@ -163,10 +197,12 @@ export function AdminDashboard({
 
       const appsData = await appsRes.json().catch(() => ({}))
       const careersData = await careersRes.json().catch(() => ({}))
+      const listingsData = await listingsRes.json().catch(() => ({}))
       const ledgerData = await ledgerRes.json().catch(() => ({}))
 
       setApplications(appsData?.applications ?? [])
       setCareers(careersData?.careers ?? [])
+      setListings(listingsData?.listings ?? [])
       setLedger(ledgerData?.logs ?? [])
       setLedgerNote(
         ledgerData?.comingSoon
@@ -269,12 +305,13 @@ export function AdminDashboard({
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {/* Summary stats */}
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
             { label: 'Applications', value: applications.length },
             { label: 'ACA', value: acaApplications.length },
             { label: 'Enrollments', value: enrollments.length },
-            { label: 'Careers', value: careers.length },
+            { label: 'Career Apps', value: careers.length },
+            { label: 'Job listings', value: listings.length },
             { label: 'Ledger events', value: ledger.length },
           ].map((s) => (
             <div key={s.label} className={cardClass}>
@@ -342,6 +379,13 @@ export function AdminDashboard({
             )}
             {tab === 'careers' && (
               <CareersTable rows={careers} onUpdateStatus={updateCareerStatus} />
+            )}
+            {tab === 'job-board' && (
+              <JobBoardEditor
+                rows={listings}
+                onChange={setListings}
+                onFlash={setFlash}
+              />
             )}
             {tab === 'ledger' && <LedgerTable rows={ledger} note={ledgerNote} />}
           </>
@@ -544,3 +588,262 @@ function LedgerTable({ rows, note }: { rows: LedgerLog[]; note: string | null })
     </div>
   )
 }
+
+const fieldClass =
+  'w-full rounded-[10px] border border-[#14432A]/15 bg-[#FAFCFB] px-3 py-2 font-sans text-[0.875rem] text-[#14432A] outline-none focus:border-[#0F3D2E]'
+
+function JobBoardEditor({
+  rows,
+  onChange,
+  onFlash,
+}: {
+  rows: CareerListingRow[]
+  onChange: (rows: CareerListingRow[]) => void
+  onFlash: (msg: string | null) => void
+}) {
+  const [draft, setDraft] = useState({ ...EMPTY_LISTING })
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const startEdit = (row: CareerListingRow) => {
+    setEditingId(row.id)
+    setDraft({
+      title: row.title,
+      department: row.department,
+      employment_type: row.employment_type,
+      location: row.location,
+      description: row.description,
+      sort_order: row.sort_order,
+      published: row.published,
+    })
+  }
+
+  const resetDraft = () => {
+    setEditingId(null)
+    setDraft({ ...EMPTY_LISTING })
+  }
+
+  const save = async () => {
+    setBusy(true)
+    onFlash(null)
+    try {
+      const res = await fetch('/api/admin/career-listings', {
+        method: editingId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingId ? { id: editingId, ...draft } : draft),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.ok) {
+        onFlash(data?.error || 'Could not save listing.')
+        return
+      }
+      const listing = data.listing as CareerListingRow
+      onChange(
+        editingId
+          ? rows.map((r) => (r.id === editingId ? listing : r))
+          : [...rows, listing].sort((a, b) => a.sort_order - b.sort_order),
+      )
+      onFlash(editingId ? 'Listing updated.' : 'Listing created.')
+      resetDraft()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (id: string) => {
+    if (!window.confirm('Delete this job listing from the careers page?')) return
+    setBusy(true)
+    onFlash(null)
+    try {
+      const res = await fetch(`/api/admin/career-listings?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.ok) {
+        onFlash(data?.error || 'Could not delete listing.')
+        return
+      }
+      onChange(rows.filter((r) => r.id !== id))
+      if (editingId === id) resetDraft()
+      onFlash('Listing deleted.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className={cardClass}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="m-0 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-[#C9A53E]">
+              Careers page editor
+            </p>
+            <h2
+              className="m-0 mt-1 font-medium text-[#14432A]"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '1.25rem' }}
+            >
+              {editingId ? 'Edit listing' : 'Add listing'}
+            </h2>
+          </div>
+          {editingId ? (
+            <button
+              type="button"
+              onClick={resetDraft}
+              className="rounded-[10px] border border-[#14432A]/20 px-3 py-2 font-sans text-[0.8125rem] font-semibold text-[#55655D]"
+            >
+              Cancel edit
+            </button>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-1 block font-sans text-[0.75rem] font-semibold text-[#14432A]">
+              Title
+            </label>
+            <input
+              className={fieldClass}
+              value={draft.title}
+              onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+              placeholder="e.g. Licensed Insurance Agent"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block font-sans text-[0.75rem] font-semibold text-[#14432A]">
+              Department
+            </label>
+            <select
+              className={fieldClass}
+              value={draft.department}
+              onChange={(e) => setDraft((d) => ({ ...d, department: e.target.value }))}
+            >
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block font-sans text-[0.75rem] font-semibold text-[#14432A]">
+              Employment type
+            </label>
+            <input
+              className={fieldClass}
+              value={draft.employment_type}
+              onChange={(e) => setDraft((d) => ({ ...d, employment_type: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block font-sans text-[0.75rem] font-semibold text-[#14432A]">
+              Location
+            </label>
+            <input
+              className={fieldClass}
+              value={draft.location}
+              onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block font-sans text-[0.75rem] font-semibold text-[#14432A]">
+              Sort order
+            </label>
+            <input
+              type="number"
+              className={fieldClass}
+              value={draft.sort_order}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, sort_order: Number(e.target.value) || 0 }))
+              }
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block font-sans text-[0.75rem] font-semibold text-[#14432A]">
+              Description
+            </label>
+            <textarea
+              className={`${fieldClass} min-h-[100px] resize-y`}
+              value={draft.description}
+              onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+            />
+          </div>
+          <label className="flex items-center gap-2 font-sans text-[0.875rem] text-[#14432A]">
+            <input
+              type="checkbox"
+              checked={draft.published}
+              onChange={(e) => setDraft((d) => ({ ...d, published: e.target.checked }))}
+              className="h-4 w-4 accent-[#0F3D2E]"
+            />
+            Published on careers page
+          </label>
+        </div>
+
+        <button
+          type="button"
+          disabled={busy || !draft.title.trim() || !draft.description.trim()}
+          onClick={() => void save()}
+          className="mt-4 inline-flex rounded-[10px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.875rem] font-semibold text-white transition hover:bg-[#0A2E22] disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : editingId ? 'Save changes' : 'Add to careers page'}
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {rows.length === 0 ? (
+          <p className="font-sans text-[0.9375rem] text-[#55655D]">
+            No job listings yet. Add one above — it will appear on the public careers page.
+          </p>
+        ) : (
+          rows.map((row) => (
+            <div key={row.id} className={cardClass}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="m-0 font-sans text-[0.9375rem] font-semibold text-[#14432A]">
+                      {row.title}
+                    </p>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 font-sans text-[0.6875rem] font-semibold uppercase ${
+                        row.published
+                          ? 'bg-[#0F3D2E]/12 text-[#0F3D2E]'
+                          : 'bg-[#14432A]/10 text-[#55655D]'
+                      }`}
+                    >
+                      {row.published ? 'Published' : 'Hidden'}
+                    </span>
+                  </div>
+                  <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
+                    {row.department} · {row.employment_type} · {row.location} · sort{' '}
+                    {row.sort_order}
+                  </p>
+                  <p className="m-0 mt-2 font-sans text-[0.875rem] leading-[1.55] text-[#55655D]">
+                    {row.description}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(row)}
+                    className="rounded-[10px] border border-[#0F3D2E] px-3 py-2 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void remove(row.id)}
+                    className="rounded-[10px] border border-[#B42318]/30 px-3 py-2 font-sans text-[0.8125rem] font-semibold text-[#B42318]"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+

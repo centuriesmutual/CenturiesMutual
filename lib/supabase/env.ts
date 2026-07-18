@@ -31,6 +31,23 @@ export function getSupabaseServiceRoleKey() {
   return key
 }
 
+/**
+ * Optional cookie domain so the Supabase session is shared across
+ * *.centuriesmutual.com (main site, wallet., admin.). Set
+ * NEXT_PUBLIC_COOKIE_DOMAIN=.centuriesmutual.com in production ONLY — leaving it
+ * unset keeps host-only cookies for local dev (localhost cannot use a domain).
+ */
+export function getCookieDomain(): string | undefined {
+  const domain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN?.trim()
+  return domain || undefined
+}
+
+/** Shared cookie options for the SSR clients. */
+export function supabaseCookieOptions() {
+  const domain = getCookieDomain()
+  return domain ? { domain } : undefined
+}
+
 export function isSupabaseConfigured() {
   try {
     getSupabaseUrl()

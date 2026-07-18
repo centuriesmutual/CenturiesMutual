@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { createClient } from '@/lib/supabase/client'
 
 export default function OfficeLogin() {
   const router = useRouter()
@@ -10,14 +11,29 @@ export default function OfficeLogin() {
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (email && password) {
+    setError('')
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      })
+      if (signInError || !data.user) {
+        setError('Invalid email or password.')
+        setLoading(false)
+        return
+      }
       router.push('/office')
-      return
+      router.refresh()
+    } catch {
+      setError('Could not sign in. Please try again.')
+      setLoading(false)
     }
-    setError('Please enter both email and password')
   }
 
   return (
@@ -122,9 +138,10 @@ export default function OfficeLogin() {
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] transition hover:bg-[#0A2E22]"
+              disabled={loading}
+              className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] transition hover:bg-[#0A2E22] disabled:opacity-60"
             >
-              Sign In
+              {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         </div>

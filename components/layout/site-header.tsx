@@ -28,7 +28,14 @@ export const SITE_HEADER_DOWNLOAD_STRIP_PX = 0
 /** Match scroll-body offset spacer to combined fixed chrome */
 export const SITE_HEADER_STACK_PX = SITE_HEADER_TOP_RULE_PX + SITE_HEADER_BAR_PX
 
-export function SiteHeader() {
+export function SiteHeader({
+  showClientPortal = true,
+  pageTitle,
+}: {
+  showClientPortal?: boolean
+  /** Optional page label shown in the header (e.g. Careers). */
+  pageTitle?: string
+} = {}) {
   const { scrollY } = useScroll()
   const pathname = usePathname()
   const prevY = useRef(0)
@@ -91,32 +98,51 @@ export function SiteHeader() {
           />
 
           <div className="relative mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-6">
-            <Link href="/" className="relative z-[1] flex min-w-0 shrink items-center gap-2 no-underline sm:gap-3">
-              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md sm:h-12 sm:w-12">
-                <Image
-                  src="/cmlogotreesmall-removebg-preview.png"
-                  alt="Centuries Mutual"
-                  width={176}
-                  height={176}
-                  className="h-full w-full object-contain object-center brightness-105"
-                  priority
-                />
-              </div>
-              <span
-                className="truncate leading-none text-[#FAF7F0]"
-                style={{
-                  fontFamily: 'var(--font-fraunces), Fraunces, Georgia, serif',
-                  fontWeight: 500,
-                  letterSpacing: '-0.02em',
-                  fontSize: 'clamp(16px,4.2vw,30px)',
-                }}
-              >
-                Centuries Mutual
-              </span>
-            </Link>
+            <div className="relative z-[1] flex min-w-0 shrink items-center gap-2 sm:gap-3">
+              <Link href="/" className="flex min-w-0 shrink items-center gap-2 no-underline sm:gap-3">
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md sm:h-12 sm:w-12">
+                  <Image
+                    src="/cmlogotreesmall-removebg-preview.png"
+                    alt="Centuries Mutual"
+                    width={176}
+                    height={176}
+                    className="h-full w-full object-contain object-center brightness-105"
+                    priority
+                  />
+                </div>
+                <span
+                  className="truncate leading-none text-[#FAF7F0]"
+                  style={{
+                    fontFamily: 'var(--font-fraunces), Fraunces, Georgia, serif',
+                    fontWeight: 500,
+                    letterSpacing: '-0.02em',
+                    fontSize: 'clamp(16px,4.2vw,30px)',
+                  }}
+                >
+                  Centuries Mutual
+                </span>
+              </Link>
+              {pageTitle ? (
+                <>
+                  <span
+                    aria-hidden
+                    className="hidden h-4 w-px shrink-0 bg-[#FAF7F0]/25 sm:block"
+                  />
+                  <h1
+                    className="m-0 truncate font-medium leading-none tracking-[0.02em] text-[#C9A961]"
+                    style={{
+                      fontFamily: 'var(--font-fraunces), Fraunces, Georgia, serif',
+                      fontSize: 'clamp(0.8rem, 1.8vw, 0.95rem)',
+                    }}
+                  >
+                    {pageTitle}
+                  </h1>
+                </>
+              ) : null}
+            </div>
 
             <div className="relative z-[1] flex shrink-0 items-center gap-3 sm:gap-4">
-              <ClientPortalButton />
+              {showClientPortal ? <ClientPortalButton /> : null}
             </div>
           </div>
         </header>

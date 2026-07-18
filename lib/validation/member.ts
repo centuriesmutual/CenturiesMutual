@@ -122,6 +122,77 @@ export const careerApplicationSchema = z.object({
   cover_letter: z.string().trim().max(5000).optional().nullable(),
 })
 
+const OPTIONAL_DATE = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.')
+  .optional()
+  .or(z.literal(''))
+
+const acaDependentSchema = z.object({
+  first_name: z.string().trim().max(60).optional().or(z.literal('')),
+  last_name: z.string().trim().max(60).optional().or(z.literal('')),
+  dob: OPTIONAL_DATE,
+  relationship: z.string().trim().max(40).optional().or(z.literal('')),
+})
+
+/**
+ * Public ACA (marketplace) enrollment submission from the hero "Enrollment"
+ * flow. Applicants may not have an account yet, so this is written server-side
+ * with the service-role key. Rich detail is stored as JSON in `notes`.
+ */
+export const acaEnrollmentSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required.').max(60),
+  middle_initial: z.string().trim().max(1).optional().or(z.literal('')),
+  last_name: z.string().trim().min(1, 'Last name is required.').max(60),
+  email: EMAIL,
+  phone: PHONE.optional(),
+  date_of_birth: DOB,
+  ssn: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\D/g, ''))
+    .refine((v) => v.length === 9, 'Enter a valid 9-digit SSN.'),
+  sex: z.string().trim().min(1, 'Select a sex as it appears on legal documents.').max(20),
+  address: z.string().trim().min(1, 'Address is required.').max(200),
+  apt: z.string().trim().max(40).optional().or(z.literal('')),
+  city: z.string().trim().min(1, 'City is required.').max(80),
+  state: z
+    .string()
+    .trim()
+    .length(2, 'State must be a 2-letter code.')
+    .transform((v) => v.toUpperCase()),
+  zip: ZIP,
+  county: z.string().trim().max(80).optional().or(z.literal('')),
+  citizenship: z.string().trim().max(60).optional().or(z.literal('')),
+  tobacco: z.enum(['Yes', 'No']).optional(),
+
+  // Enrollment period / SEP declaration
+  enrollment_period: z.enum(['open', 'sep']),
+  sep_qualifying_event: z.string().trim().max(120).optional().or(z.literal('')),
+  sep_event_date: OPTIONAL_DATE,
+
+  // Household & income
+  household_size: z.coerce.number().int().min(1).max(20),
+  annual_income: z.coerce.number().min(0).max(100000000),
+  filing_status: z.string().trim().max(60).optional().or(z.literal('')),
+  current_coverage: z.string().trim().max(80).optional().or(z.literal('')),
+  coverage_start: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a coverage start date.'),
+  dependents: z.array(acaDependentSchema).max(15).optional(),
+
+  // Attestations
+  sep_attested: z.boolean().optional(),
+  disclosures_accepted: z.boolean().refine((v) => v === true, {
+    message: 'You must accept the disclosures to continue.',
+  }),
+  signature: z.string().trim().min(2, 'Type your full legal name to e-sign.').max(120),
+})
+
+export type AcaEnrollmentInput = z.infer<typeof acaEnrollmentSchema>
+
 export function formatZodError(error: z.ZodError) {
   return error.flatten().fieldErrors
 }
