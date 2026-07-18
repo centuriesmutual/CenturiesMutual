@@ -193,6 +193,55 @@ export const acaEnrollmentSchema = z.object({
 
 export type AcaEnrollmentInput = z.infer<typeof acaEnrollmentSchema>
 
+/**
+ * Public ingest from medicare.reviews → Centuries Mutual admin Files vault.
+ * Written with the service-role key; tagged source=medicare.reviews.
+ */
+export const medicareReviewsIngestSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required.').max(60),
+  last_name: z.string().trim().min(1, 'Last name is required.').max(60),
+  email: EMAIL,
+  phone: PHONE.optional(),
+  date_of_birth: DOB.optional(),
+  address: z.string().trim().max(200).optional().or(z.literal('')),
+  city: z.string().trim().max(80).optional().or(z.literal('')),
+  state: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase())
+    .refine((v) => v.length === 0 || v.length === 2, {
+      message: 'State must be a 2-letter code.',
+    })
+    .optional()
+    .or(z.literal('')),
+  zip: z
+    .string()
+    .trim()
+    .refine((v) => v.length === 0 || /^\d{5}(-\d{4})?$/.test(v), {
+      message: 'Enter a valid US ZIP code.',
+    })
+    .optional()
+    .or(z.literal('')),
+  plan_type: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .or(z.literal('')),
+  medicare_number: z.string().trim().max(40).optional().or(z.literal('')),
+  preferred_language: z.string().trim().max(40).optional().or(z.literal('')),
+  county: z.string().trim().max(80).optional().or(z.literal('')),
+  coverage_start: OPTIONAL_DATE,
+  lead_id: z.string().trim().max(120).optional().or(z.literal('')),
+  marketing_id: z.string().trim().max(120).optional().or(z.literal('')),
+  producer_id: z.string().trim().max(120).optional().or(z.literal('')),
+  /** Free-form extras from medicare.reviews — stored inside notes JSON. */
+  meta: z.record(z.unknown()).optional(),
+  notes: z.string().trim().max(5000).optional().nullable(),
+})
+
+export type MedicareReviewsIngestInput = z.infer<typeof medicareReviewsIngestSchema>
+
 export function formatZodError(error: z.ZodError) {
   return error.flatten().fieldErrors
 }

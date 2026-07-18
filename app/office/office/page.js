@@ -40,9 +40,20 @@ import {
 } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import Chat from '@/components/office/Chat';
+import { createClient } from '@/lib/supabase/client';
+
+function isStaffUser(user) {
+  if (!user) return false;
+  const role = user.app_metadata?.role;
+  if (role === 'admin' || role === 'staff_admin') return true;
+  const email = (user.email || '').trim().toLowerCase();
+  return email === 'centuriesmutual@gmail.com';
+}
 
 export default function Office() {
   const router = useRouter();
+  const [authReady, setAuthReady] = useState(false);
+  const [staffEmail, setStaffEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isCallActive, setIsCallActive] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
@@ -477,6 +488,39 @@ export default function Office() {
 
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!active) return;
+        if (!isStaffUser(user)) {
+          router.replace('/office');
+          return;
+        }
+        setStaffEmail(user.email || '');
+        setAuthReady(true);
+      } catch {
+        if (active) router.replace('/office');
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } finally {
+      router.replace('/office');
+    }
+  };
 
   // Format time helper function
   const formatTime = (date) => {
@@ -1530,6 +1574,14 @@ export default function Office() {
 
   const [showSalesModal, setShowSalesModal] = useState(false);
 
+  if (!authReady) {
+    return (
+      <div className="office-container d-flex align-items-center justify-content-center" style={{ minHeight: '100vh' }}>
+        <p className="text-muted mb-0">Checking office access…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="office-container">
       <style jsx>{`
@@ -1549,9 +1601,9 @@ export default function Office() {
         }
 
         .form-control:not(:placeholder-shown) {
-          border-color: #3b82f6 !important;
-          box-shadow: 0 0 0 1px #3b82f6 !important;
-          background-color: #f8fafc !important;
+          border-color: #0F3D2E !important;
+          box-shadow: 0 0 0 1px #0F3D2E !important;
+          background-color: #F7F3EE !important;
         }
 
         .completion-indicator {
@@ -1560,15 +1612,15 @@ export default function Office() {
           left: 50%;
           transform: translateX(-50%);
           padding: 8px 16px;
-          background: rgba(255, 255, 255, 0.95);
-          border: 1px solid #e5e7eb;
+          background: rgba(250, 252, 251, 0.96);
+          border: 1px solid rgba(15, 61, 46, 0.12);
           border-radius: 8px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 2px 4px rgba(15, 61, 46, 0.08);
           display: flex;
           align-items: center;
           gap: 8px;
           font-size: 14px;
-          color: #6b7280;
+          color: #3d4a41;
           z-index: 1000;
         }
 
@@ -1580,11 +1632,11 @@ export default function Office() {
         }
 
         .completion-dot.complete {
-          background-color: #3b82f6;
+          background-color: #0F3D2E;
         }
 
         .completion-dot.incomplete {
-          background-color: #e5e7eb;
+          background-color: #D9D0C4;
         }
 
         @keyframes pulse {
@@ -1604,25 +1656,25 @@ export default function Office() {
         }
 
         .meeting-room-indicator {
-          background-color: #0dcaf0;
+          background-color: #0F3D2E;
           color: white;
           transition: all 0.3s ease;
         }
 
         .meeting-room-indicator:hover {
-          background-color: #0bb5d8;
+          background-color: #0A2E22;
         }
 
         .meeting-room-indicator.active {
-          background-color: #0bb5d8;
-          box-shadow: 0 0 0 2px rgba(13, 202, 240, 0.25);
+          background-color: #0A2E22;
+          box-shadow: 0 0 0 2px rgba(201, 169, 97, 0.35);
         }
       `}</style>
       <Container fluid>
         <div className="workspace-header">
           <div className="welcome-section">
             <h1>Office Workspace</h1>
-            <p className="text-muted">Welcome back! Here's your overview for today</p>
+            <p className="text-muted">Centuries Mutual · your agent floor for today</p>
           </div>
           <div className="quick-actions">
             {/* Meeting Room Status */}
@@ -1899,8 +1951,8 @@ export default function Office() {
                         )}
                       </div>
                       <div>
-                        <h6 className="mb-0">John Doe</h6>
-                        <small className="text-muted">john.doe@example.com</small>
+                        <h6 className="mb-0">{staffEmail ? staffEmail.split('@')[0] : 'Staff'}</h6>
+                        <small className="text-muted">{staffEmail || 'office@centuriesmutual.com'}</small>
                       </div>
                     </div>
                   </div>
@@ -1918,7 +1970,10 @@ export default function Office() {
                     <a 
                       href="#" 
                       className="dropdown-item text-danger"
-                      onClick={() => router.push('/login')}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void handleLogout();
+                      }}
                     >
                       <FaSignOutAlt className="me-2" /> Logout
                     </a>

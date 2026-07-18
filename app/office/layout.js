@@ -4,19 +4,19 @@ import './admin/admin.css'
 import BootstrapClient from './components/BootstrapClient'
 
 export const metadata = {
-  title: 'Office Dashboard',
-  description: 'Modern office management system',
-  keywords: 'office dashboard, workspace management, professional tools',
-  openGraph: {
-    title: 'Office Dashboard',
-    description: 'Professional office dashboard for managing your workspace.',
-    type: 'website',
-  },
+  title: 'Office · Centuries Mutual',
+  description: 'Centuries Mutual agent workspace',
 }
 
 export default function OfficeLayout({ children }) {
   return (
     <>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+      />
       <BootstrapClient />
       {children}
     </>

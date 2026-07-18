@@ -1,9 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+
+function isStaffUser(user) {
+  if (!user) return false
+  const role = user.app_metadata?.role
+  if (role === 'admin' || role === 'staff_admin') return true
+  const email = (user.email || '').trim().toLowerCase()
+  return email === 'centuriesmutual@gmail.com'
+}
 
 export default function OfficeLogin() {
   const router = useRouter()
@@ -12,6 +20,31 @@ export default function OfficeLogin() {
   const [remember, setRemember] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const supabase = createClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!active) return
+        if (isStaffUser(user)) {
+          router.replace('/office/office')
+          return
+        }
+      } catch {
+        /* stay on login */
+      } finally {
+        if (active) setChecking(false)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [router])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -27,13 +60,26 @@ export default function OfficeLogin() {
         setError('Invalid email or password.')
         return
       }
-      router.push('/office')
+      if (!isStaffUser(data.user)) {
+        await supabase.auth.signOut()
+        setError('This account is not authorized for Office access.')
+        return
+      }
+      router.replace('/office/office')
       router.refresh()
     } catch {
       setError('Could not sign in. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-[#0F3D2E]">
+        <p className="font-sans text-[0.9375rem] text-white/70">Loading…</p>
+      </main>
+    )
   }
 
   return (
@@ -94,16 +140,13 @@ export default function OfficeLogin() {
                 required
                 autoComplete="email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value)
-                  if (error) setError('')
-                }}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 className="w-full rounded-[10px] border border-[#14432A]/15 bg-white px-3.5 py-2.5 font-sans text-[0.9375rem] text-[#14432A] outline-none transition focus:border-[#0F3D2E] focus:ring-2 focus:ring-[#0F3D2E]/15"
               />
             </div>
 
-            <div className="mb-5">
+            <div className="mb-4">
               <label
                 htmlFor="office-password"
                 className="mb-1.5 block font-sans text-[0.8125rem] font-semibold text-[#14432A]"
@@ -117,21 +160,18 @@ export default function OfficeLogin() {
                 required
                 autoComplete="current-password"
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  if (error) setError('')
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 className="w-full rounded-[10px] border border-[#14432A]/15 bg-white px-3.5 py-2.5 font-sans text-[0.9375rem] text-[#14432A] outline-none transition focus:border-[#0F3D2E] focus:ring-2 focus:ring-[#0F3D2E]/15"
               />
             </div>
 
-            <label className="mb-5 flex items-center gap-2 font-sans text-[0.875rem] text-[#55655D]">
+            <label className="mb-5 flex items-center gap-2 font-sans text-[0.8125rem] text-[#55655D]">
               <input
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
-                className="h-4 w-4 rounded accent-[#0F3D2E]"
+                className="h-4 w-4 accent-[#0F3D2E]"
               />
               Remember me
             </label>
@@ -139,12 +179,15 @@ export default function OfficeLogin() {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-2.5 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] transition hover:bg-[#0A2E22] disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#0F3D2E] px-4 py-3 font-sans text-[0.9375rem] font-semibold text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         </div>
+        <p className="mt-4 text-center font-sans text-[0.75rem] text-white/50">
+          Centuries Mutual · Office access
+        </p>
       </div>
     </main>
   )
