@@ -125,16 +125,16 @@ export function CommunityHero() {
                 </p>
                 <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:flex-nowrap">
                   <Link
-                    href="/downloads"
-                    className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0F3D2E] px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] no-underline"
-                  >
-                    Download App
-                  </Link>
-                  <Link
                     href="/createaccount"
                     className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[#0F3D2E] bg-transparent px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] no-underline"
                   >
                     Create Account
+                  </Link>
+                  <Link
+                    href="/enroll"
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0F3D2E] px-3 py-1.5 font-sans text-[0.75rem] font-semibold tracking-[0.01em] text-[#FAFCFB] shadow-[0_6px_18px_-8px_rgba(15,61,46,0.5)] transition hover:bg-[#0A2E22] no-underline"
+                  >
+                    Enroll
                   </Link>
                 </div>
               </div>

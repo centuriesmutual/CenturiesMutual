@@ -19,7 +19,7 @@ export const GRAIN_BG =
   'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27220%27 height=%27220%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.82%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27220%27 height=%27220%27 filter=%27url(%23n)%27 opacity=%270.52%27/%3E%3C/svg%3E")'
 
 /** Primary header row height */
-export const SITE_HEADER_BAR_PX = 56
+export const SITE_HEADER_BAR_PX = 68
 /** Thin gold rule above header */
 export const SITE_HEADER_TOP_RULE_PX = 1
 /** Reserved for optional promo strip (unused) */
@@ -77,7 +77,7 @@ export function SiteHeader() {
 
         <header
           className={cn(
-            'relative flex h-[56px] w-full shrink-0 items-stretch bg-[#0F3D2E] px-4 sm:px-6 lg:px-8',
+            'relative flex h-[68px] w-full shrink-0 items-stretch bg-[#0F3D2E] px-4 sm:px-6 lg:px-8',
           )}
         >
           <div
@@ -92,7 +92,7 @@ export function SiteHeader() {
 
           <div className="relative mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-6">
             <Link href="/" className="relative z-[1] flex min-w-0 shrink items-center gap-2 no-underline sm:gap-3">
-              <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md sm:h-10 sm:w-10">
+              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md sm:h-12 sm:w-12">
                 <Image
                   src="/cmlogotreesmall-removebg-preview.png"
                   alt="Centuries Mutual"
@@ -108,7 +108,7 @@ export function SiteHeader() {
                   fontFamily: 'var(--font-fraunces), Fraunces, Georgia, serif',
                   fontWeight: 500,
                   letterSpacing: '-0.02em',
-                  fontSize: 'clamp(14px,3.8vw,26px)',
+                  fontSize: 'clamp(16px,4.2vw,30px)',
                 }}
               >
                 Centuries Mutual
@@ -144,7 +144,7 @@ function ClientPortalButton() {
         whileHover={{ scale: 1.03, y: -1 }}
         whileTap={{ scale: 0.97 }}
         transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-        className="inline-flex items-center justify-center rounded-[10px] border-0 bg-[#FAFCFB] px-3 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E] shadow-sm sm:px-4 sm:text-[10px] sm:tracking-[0.14em]"
+        className="inline-flex items-center justify-center rounded-[10px] border-0 bg-[#FAFCFB] px-3 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E] shadow-sm sm:px-3.5 sm:text-[10px] sm:tracking-[0.14em]"
       >
         Client Portal
       </motion.button>
