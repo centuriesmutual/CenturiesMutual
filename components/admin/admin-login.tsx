@@ -24,11 +24,15 @@ export function AdminLogin({ notAuthorized, email, onSignedIn, onSignOut }: Prop
     try {
       const supabase = createClient()
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
       })
       if (signInError || !data.user) {
-        setError('Invalid email or password.')
+        setError(
+          signInError?.message?.toLowerCase().includes('email not confirmed')
+            ? 'This account email is not confirmed yet.'
+            : 'Invalid email or password.',
+        )
         setLoading(false)
         return
       }

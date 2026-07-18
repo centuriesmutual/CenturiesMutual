@@ -56,11 +56,14 @@ export async function authenticateUser(
     if (error || !data.user) return null
 
     // Optional allowlist — defaults to ADMIN_EMAILS when set.
+    // Staff with app_metadata.role admin/staff_admin are always allowed.
+    const metaRole = data.user.app_metadata?.role
+    const isStaffMeta = metaRole === 'admin' || metaRole === 'staff_admin'
     const allow = (process.env.ADMIN_EMAILS ?? '')
       .split(',')
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean)
-    if (allow.length > 0 && !allow.includes(normalized)) {
+    if (!isStaffMeta && allow.length > 0 && !allow.includes(normalized)) {
       await supabase.auth.signOut()
       return null
     }

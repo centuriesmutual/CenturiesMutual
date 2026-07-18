@@ -22,6 +22,14 @@ export function isAdminEmail(email?: string | null): boolean {
   return adminEmails().includes(email.trim().toLowerCase())
 }
 
+/** True when the user is allowlisted or has staff admin metadata in Supabase Auth. */
+export function isAdminUser(user?: Pick<User, 'email' | 'app_metadata'> | null): boolean {
+  if (!user) return false
+  if (isAdminEmail(user.email)) return true
+  const role = user.app_metadata?.role
+  return role === 'admin' || role === 'staff_admin'
+}
+
 export type AdminSession =
   | { authenticated: boolean; admin: boolean; email: string | null }
 
@@ -37,7 +45,7 @@ export async function getAdminSession(): Promise<AdminSession> {
   }
   return {
     authenticated: true,
-    admin: isAdminEmail(user.email),
+    admin: isAdminUser(user),
     email: user.email ?? null,
   }
 }
@@ -61,7 +69,7 @@ export async function requireAdmin(): Promise<
     }
   }
 
-  if (!isAdminEmail(user.email)) {
+  if (!isAdminUser(user)) {
     return {
       error: NextResponse.json(
         { ok: false, error: 'Forbidden — admin access required.' },

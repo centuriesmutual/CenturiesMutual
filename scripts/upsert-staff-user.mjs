@@ -68,25 +68,35 @@ if (listError) {
 
 const existing = listed.users.find((u) => u.email?.toLowerCase() === email)
 
+const staffMeta = {
+  role: 'admin',
+  portals: ['admin', 'office', 'campaign', 'editor'],
+}
+
 if (existing) {
   const { data, error } = await admin.auth.admin.updateUserById(existing.id, {
     password,
     email_confirm: true,
+    app_metadata: {
+      ...(existing.app_metadata || {}),
+      ...staffMeta,
+    },
   })
   if (error) {
     console.error('UPDATE_FAIL', error.message)
     process.exit(1)
   }
-  console.log('UPDATED', data.user?.id, email)
+  console.log('UPDATED', data.user?.id, email, 'role=', data.user?.app_metadata?.role)
 } else {
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
+    app_metadata: staffMeta,
   })
   if (error) {
     console.error('CREATE_FAIL', error.message)
     process.exit(1)
   }
-  console.log('CREATED', data.user?.id, email)
+  console.log('CREATED', data.user?.id, email, 'role=', data.user?.app_metadata?.role)
 }
