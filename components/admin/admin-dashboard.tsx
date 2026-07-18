@@ -169,6 +169,42 @@ function isMedicareApplication(a: { plan_type: string | null; source: string | n
   )
 }
 
+function planTypeCategory(
+  a: Application,
+): 'ACA' | 'Medicare Advantage' | 'Medicare Supplement' | null {
+  const plan = (a.plan_type || '').toLowerCase()
+  const source = (a.source || '').toLowerCase()
+  if (/supplement|medigap/.test(plan)) return 'Medicare Supplement'
+  if (/advantage/.test(plan) || source === 'medicare.reviews') return 'Medicare Advantage'
+  if (/medicare/.test(plan) && !/supplement|medigap/.test(plan)) return 'Medicare Advantage'
+  if (/aca|marketplace|individual\s*&\s*family/.test(plan)) return 'ACA'
+  if (source === 'enrollment' || /aca/.test(source)) return 'ACA'
+  if (isAcaApplication(a)) return 'ACA'
+  if (isMedicareApplication(a)) return 'Medicare Advantage'
+  return null
+}
+
+function HorseIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M4 16c1.2-2.5 2-5.2 2.2-7.2.2-1.6 1.2-2.8 2.8-3.2 1.1-.3 2.2 0 3 .7l1.2 1.1c.5.5 1.2.7 1.9.6l2.2-.3c1.3-.2 2.5.7 2.8 2 .2.8 0 1.6-.5 2.2L17 14.5" />
+      <path d="M6.5 9.5c.8.2 1.5.8 1.8 1.6" />
+      <path d="M9 18.5v-3.2c0-1.2.6-2.3 1.6-2.9L14 10" />
+      <path d="M11.5 18.5h5.2c1.3 0 2.3-1.1 2.1-2.4l-.4-2.1" />
+      <path d="M8.2 6.2 7 4.8" />
+    </svg>
+  )
+}
+
 function fmtDate(iso?: string | null) {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -511,18 +547,202 @@ function folderFor(a: Application): FileFolderId {
   return 'other'
 }
 
-function enrollmentBadge(status: string) {
+function enrollmentBadge(status: string, opts?: { onClick?: () => void; title?: string }) {
   const active = ENROLLED_STATUSES.has(status)
+  const className = `inline-flex items-center rounded-full px-2 py-0.5 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.06em] ${
+    active ? 'bg-[#0F3D2E] text-[#E8DFD6]' : 'bg-[#0F3D2E]/10 text-[#55655D]'
+  } ${opts?.onClick ? 'cursor-pointer transition hover:opacity-80' : ''}`
+  const label = active ? 'Active' : 'Inactive'
+  if (opts?.onClick) {
+    return (
+      <button
+        type="button"
+        onClick={opts.onClick}
+        title={opts.title || 'View enrollment history'}
+        className={`border-0 ${className}`}
+      >
+        {label}
+      </button>
+    )
+  }
+  return <span className={className}>{label}</span>
+}
+
+function buildEnrollmentEvents(app: Application) {
+  const detail = parseEnrollmentNotes(app.notes)
+  const agentId = getAgentOfRecord(app.notes)
+  const events: { at: string; title: string; detail: string }[] = [
+    {
+      at: app.created_at,
+      title: 'Application submitted',
+      detail: `${sourceLabel(app)}${app.plan_type ? ` · ${app.plan_type}` : ''}`,
+    },
+    {
+      at: app.created_at,
+      title: `Status · ${app.application_status.replace(/_/g, ' ')}`,
+      detail: `Application ID ${app.id}`,
+    },
+  ]
+  if (agentId) {
+    events.push({
+      at: app.created_at,
+      title: 'Agent of Record',
+      detail: agentId,
+    })
+  }
+  if (detail?.enrollment_period) {
+    events.push({
+      at: app.created_at,
+      title: 'Enrollment period',
+      detail:
+        detail.enrollment_period === 'sep' ? 'Special Enrollment Period' : 'Open Enrollment',
+    })
+  }
+  if (detail?.household?.coverage_start) {
+    events.push({
+      at: detail.household.coverage_start,
+      title: 'Coverage start',
+      detail: detail.household.coverage_start,
+    })
+  }
+  if (detail?.sep?.qualifying_event) {
+    events.push({
+      at: detail.sep.event_date || app.created_at,
+      title: 'SEP qualifying event',
+      detail: `${detail.sep.qualifying_event}${
+        detail.sep.event_date ? ` · ${detail.sep.event_date}` : ''
+      }`,
+    })
+  }
+  if (typeof detail?.household?.annual_income === 'number') {
+    events.push({
+      at: app.created_at,
+      title: 'Household income recorded',
+      detail: `$${detail.household.annual_income.toLocaleString('en-US')}${
+        detail.household.size ? ` · HH ${detail.household.size}` : ''
+      }`,
+    })
+  }
+  if (Array.isArray(detail?.dependents) && detail.dependents.length > 0) {
+    events.push({
+      at: app.created_at,
+      title: 'Dependents',
+      detail: `${detail.dependents.length} dependent${detail.dependents.length === 1 ? '' : 's'}`,
+    })
+  }
+  return events
+}
+
+function EnrollmentHistoryModal({
+  app,
+  onClose,
+}: {
+  app: Application
+  onClose: () => void
+}) {
+  const detail = parseEnrollmentNotes(app.notes)
+  const events = useMemo(() => buildEnrollmentEvents(app), [app])
+  const active = ENROLLED_STATUSES.has(app.application_status)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.06em] ${
-        active
-          ? 'bg-[#0F3D2E] text-[#E8DFD6]'
-          : 'bg-[#0F3D2E]/10 text-[#55655D]'
-      }`}
+    <div
+      className="fixed inset-0 z-[65] flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="enrollment-history-title"
+      onClick={onClose}
     >
-      {active ? 'Active' : 'Inactive'}
-    </span>
+      <div
+        className="flex max-h-[min(88vh,560px)] w-full max-w-lg flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3">
+          <div>
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Enrollment
+            </p>
+            <h2
+              id="enrollment-history-title"
+              className="m-0 mt-0.5 font-medium text-[#0F3D2E]"
+              style={{ ...displayFont, fontSize: '1.15rem' }}
+            >
+              {app.first_name} {app.last_name}
+            </h2>
+            <div className="mt-1.5">{enrollmentBadge(app.application_status)}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[10px] border-0 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] font-semibold text-[#55655D] transition hover:bg-[#0F3D2E]/[0.06] hover:text-[#0F3D2E]"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-3 py-2.5">
+              <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                Coverage start
+              </p>
+              <p className="m-0 mt-0.5 font-sans text-[0.8125rem] text-[#0F3D2E]">
+                {detail?.household?.coverage_start || '—'}
+              </p>
+            </div>
+            <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-3 py-2.5">
+              <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                Submitted
+              </p>
+              <p className="m-0 mt-0.5 font-sans text-[0.8125rem] text-[#0F3D2E]">
+                {fmtDate(app.created_at)}
+              </p>
+            </div>
+            <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-3 py-2.5 sm:col-span-2">
+              <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                Enrollment status
+              </p>
+              <p className="m-0 mt-0.5 font-sans text-[0.8125rem] text-[#0F3D2E]">
+                {active ? 'Active' : 'Inactive'}
+                <span className="text-[#55655D]">
+                  {' '}
+                  · {app.application_status.replace(/_/g, ' ')}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <section>
+            <h3 className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
+              Enrollment history
+            </h3>
+            <ul className="m-0 mt-2 list-none space-y-2 p-0">
+              {events.map((ev, i) => (
+                <li
+                  key={`${ev.title}-${i}`}
+                  className="rounded-[12px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2.5"
+                >
+                  <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">{fmtDate(ev.at)}</p>
+                  <p className="m-0 mt-0.5 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
+                    {ev.title}
+                  </p>
+                  <p className="m-0 mt-0.5 break-words font-sans text-[0.75rem] text-[#55655D]">
+                    {ev.detail}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1172,74 +1392,11 @@ function DirectoryHistoryModal({
   app: Application
   onClose: () => void
 }) {
-  const detail = parseEnrollmentNotes(app.notes)
   const currentNotes = getDirectoryNotes(app.notes)
   const notesHistory = getNotesHistory(app.notes)
   const microLedger = getMicroLedger(app.notes)
-  const agentId = getAgentOfRecord(app.notes)
 
-  const enrollmentEvents = useMemo(() => {
-    const events: { at: string; title: string; detail: string }[] = [
-      {
-        at: app.created_at,
-        title: 'Application submitted',
-        detail: `${sourceLabel(app)}${app.plan_type ? ` · ${app.plan_type}` : ''}`,
-      },
-      {
-        at: app.created_at,
-        title: `Status · ${app.application_status.replace(/_/g, ' ')}`,
-        detail: `Application ID ${app.id}`,
-      },
-    ]
-    if (agentId) {
-      events.push({
-        at: app.created_at,
-        title: 'Agent of Record',
-        detail: agentId,
-      })
-    }
-    if (detail?.enrollment_period) {
-      events.push({
-        at: app.created_at,
-        title: 'Enrollment period',
-        detail:
-          detail.enrollment_period === 'sep' ? 'Special Enrollment Period' : 'Open Enrollment',
-      })
-    }
-    if (detail?.household?.coverage_start) {
-      events.push({
-        at: detail.household.coverage_start,
-        title: 'Coverage start',
-        detail: detail.household.coverage_start,
-      })
-    }
-    if (detail?.sep?.qualifying_event) {
-      events.push({
-        at: detail.sep.event_date || app.created_at,
-        title: 'SEP qualifying event',
-        detail: `${detail.sep.qualifying_event}${
-          detail.sep.event_date ? ` · ${detail.sep.event_date}` : ''
-        }`,
-      })
-    }
-    if (typeof detail?.household?.annual_income === 'number') {
-      events.push({
-        at: app.created_at,
-        title: 'Household income recorded',
-        detail: `$${detail.household.annual_income.toLocaleString('en-US')}${
-          detail.household.size ? ` · HH ${detail.household.size}` : ''
-        }`,
-      })
-    }
-    if (Array.isArray(detail?.dependents) && detail.dependents.length > 0) {
-      events.push({
-        at: app.created_at,
-        title: 'Dependents',
-        detail: `${detail.dependents.length} dependent${detail.dependents.length === 1 ? '' : 's'}`,
-      })
-    }
-    return events
-  }, [app, agentId, detail])
+  const enrollmentEvents = useMemo(() => buildEnrollmentEvents(app), [app])
 
   const noteEntries = useMemo(() => {
     const entries: { at: string; text: string; current?: boolean }[] = []
@@ -1400,6 +1557,7 @@ function ClientsDirectoryPanel({
   const [ssnRevealed, setSsnRevealed] = useState(false)
   const [callTarget, setCallTarget] = useState<SoftPhoneTarget | null>(null)
   const [microLedgerOpen, setMicroLedgerOpen] = useState(false)
+  const [enrollmentOpen, setEnrollmentOpen] = useState(false)
   const lastViewedId = useRef<string | null>(null)
 
   const matches = useMemo(() => {
@@ -1444,6 +1602,7 @@ function ClientsDirectoryPanel({
     setHistoryOpen(false)
     setSsnRevealed(false)
     setMicroLedgerOpen(false)
+    setEnrollmentOpen(false)
   }, [selected?.id])
 
   useEffect(() => {
@@ -1452,7 +1611,6 @@ function ClientsDirectoryPanel({
     void onAudit(selectedId, 'viewed', 'Directory', { silent: true })
   }, [selectedId, onAudit])
 
-  const detail = selected ? parseEnrollmentNotes(selected.notes) : null
   const fullSsn = selected ? getFullSsn(selected.notes) : ''
   const microLedger = selected ? getMicroLedger(selected.notes) : []
 
@@ -1489,18 +1647,15 @@ function ClientsDirectoryPanel({
   }, [applications, selected])
 
   const fieldDefs = [
-    'Application ID',
-    'Agent of Record',
     'First name',
     'Last name',
     'Email',
     'Phone number',
     'Date of birth',
     'Plan type',
-    'Source',
     'Address',
-    'Coverage start',
-    'Submitted',
+    'Application ID',
+    'Agent of Record',
   ] as const
 
   const fields: { label: string; value: string; warning?: string | null }[] = fieldDefs.map(
@@ -1523,8 +1678,6 @@ function ClientsDirectoryPanel({
           return { label, value: selected.date_of_birth || '' }
         case 'Plan type':
           return { label, value: selected.plan_type || '' }
-        case 'Source':
-          return { label, value: sourceLabel(selected) }
         case 'Address':
           return {
             label,
@@ -1533,10 +1686,6 @@ function ClientsDirectoryPanel({
                 .filter(Boolean)
                 .join(', ') || '',
           }
-        case 'Coverage start':
-          return { label, value: detail?.household?.coverage_start || '' }
-        case 'Submitted':
-          return { label, value: fmtDate(selected.created_at) }
         default:
           return { label, value: '' }
       }
@@ -1574,6 +1723,7 @@ function ClientsDirectoryPanel({
     setHistoryOpen(false)
     setSsnRevealed(false)
     setMicroLedgerOpen(false)
+    setEnrollmentOpen(false)
   }
 
   const emptyFieldClass =
@@ -1601,7 +1751,10 @@ function ClientsDirectoryPanel({
                 <h3 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
                   {selected.first_name} {selected.last_name}
                 </h3>
-                {enrollmentBadge(selected.application_status)}
+                {enrollmentBadge(selected.application_status, {
+                  onClick: () => setEnrollmentOpen(true),
+                  title: 'View coverage start, submitted date, and enrollment history',
+                })}
               </>
             ) : (
               <h3 className="m-0 font-medium text-[#55655D]" style={{ ...displayFont, fontSize: '1.15rem' }}>
@@ -1610,10 +1763,21 @@ function ClientsDirectoryPanel({
             )}
           </div>
           <div className="grid min-h-0 shrink grid-cols-1 content-start gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
-            {fields.map((f) => (
+            {fields.map((f) => {
+              const planCategory =
+                f.label === 'Plan type' && selected ? planTypeCategory(selected) : null
+              return (
               <label key={f.label} className="block">
                 <span className="mb-1 flex items-center gap-1 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  {f.label === 'Plan type' ? (
+                    <HorseIcon className="h-3 w-3 shrink-0 text-[#0F3D2E]" />
+                  ) : null}
                   {f.label}
+                  {planCategory ? (
+                    <span className="ml-0.5 inline-flex rounded-full bg-[#0F3D2E]/10 px-1.5 py-0.5 font-sans text-[0.5rem] font-semibold tracking-[0.04em] text-[#0F3D2E]">
+                      {planCategory}
+                    </span>
+                  ) : null}
                   {f.label === 'Phone number' ? (
                     <button
                       type="button"
@@ -1643,7 +1807,8 @@ function ClientsDirectoryPanel({
                   className={selected ? filledFieldClass : emptyFieldClass}
                 />
               </label>
-            ))}
+              )
+            })}
             <div className="block">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
@@ -1701,16 +1866,11 @@ function ClientsDirectoryPanel({
                 <p className="m-0 font-sans text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
                   Micro ledger
                 </p>
-                <p className="m-0 mt-0.5 truncate font-sans text-[0.5625rem] leading-snug text-[#55655D]">
-                  {formatMicroLedgerLine(microLedger[0], { shortDate: true })}
-                </p>
-                {microLedger.length > 1 ? (
-                  <p className="m-0 mt-0.5 font-sans text-[0.5rem] text-[#0F3D2E]/55">
-                    +{microLedger.length - 1} earlier · click to view all
-                  </p>
-                ) : null}
-              </button>
-            ) : null}
+              <p className="m-0 mt-0.5 truncate font-sans text-[0.5625rem] leading-snug text-[#55655D]">
+                {formatMicroLedgerLine(microLedger[0], { shortDate: true })}
+              </p>
+            </button>
+          ) : null}
             <div className="mt-2 flex shrink-0 justify-end">
               <button
                 type="button"
@@ -1718,7 +1878,7 @@ function ClientsDirectoryPanel({
                   !selected || savingNotes || notesDraft === getDirectoryNotes(selected.notes)
                 }
                 onClick={() => void saveNotes()}
-                className="shrink-0 rounded-[10px] bg-[#0F3D2E] px-4 py-2 font-sans text-[0.75rem] font-semibold text-[#E8DFD6] transition hover:bg-[#0A2E22] disabled:opacity-50"
+                className="shrink-0 rounded-[10px] bg-[#0F3D2E] px-4 py-1.5 font-sans text-[0.75rem] font-semibold leading-none text-[#E8DFD6] transition hover:bg-[#0A2E22] disabled:opacity-50"
               >
                 {savingNotes ? 'Saving…' : 'Save notes'}
               </button>
@@ -1806,6 +1966,10 @@ function ClientsDirectoryPanel({
 
       {historyOpen && selected ? (
         <DirectoryHistoryModal app={selected} onClose={() => setHistoryOpen(false)} />
+      ) : null}
+
+      {enrollmentOpen && selected ? (
+        <EnrollmentHistoryModal app={selected} onClose={() => setEnrollmentOpen(false)} />
       ) : null}
 
       {microLedgerOpen && selected ? (
