@@ -21,6 +21,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* Impact.com site verification — requires non-standard `value` attr */}
+        <meta
+          name="impact-site-verification"
+          {...({
+            value: '2d2aebf4-a1d2-49f5-ac1a-312b19c830f9',
+          } as Record<string, string>)}
+        />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
