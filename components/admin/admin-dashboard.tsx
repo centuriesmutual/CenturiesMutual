@@ -1495,14 +1495,12 @@ function ClientsDirectoryPanel({
   const fieldDefs = [
     'Application ID',
     'Agent of Record',
-    'Enrollment',
     'First name',
     'Last name',
     'Email',
     'Phone number',
     'Date of birth',
     'Plan type',
-    'Status',
     'Source',
     'Address',
     'Coverage start',
@@ -1517,8 +1515,6 @@ function ClientsDirectoryPanel({
           return { label, value: selected.id }
         case 'Agent of Record':
           return { label, value: getAgentOfRecord(selected.notes) }
-        case 'Enrollment':
-          return { label, value: enrollmentActiveLabel(selected.application_status) }
         case 'First name':
           return { label, value: selected.first_name || '' }
         case 'Last name':
@@ -1531,8 +1527,6 @@ function ClientsDirectoryPanel({
           return { label, value: selected.date_of_birth || '' }
         case 'Plan type':
           return { label, value: selected.plan_type || '' }
-        case 'Status':
-          return { label, value: selected.application_status.replace(/_/g, ' ') }
         case 'Source':
           return { label, value: sourceLabel(selected) }
         case 'Address':
