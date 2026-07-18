@@ -28,7 +28,7 @@ const FOOTER_COLUMNS: ReadonlyArray<FooterColumn> = [
     links: [
       { href: '/treasury', label: 'Rewards Wallet' },
       { href: '/pay', label: 'Rent, Bills & Groceries' },
-      { href: '/rentalequity', label: 'Compound Earnings' },
+      { href: '/compoundearnings', label: 'Compound Earnings' },
       { href: '/utilities', label: 'Utilities' },
     ],
   },

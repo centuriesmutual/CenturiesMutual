@@ -1,12 +1,6 @@
-import type { Metadata } from 'next'
-import { CompoundEarningsPageView } from '@/components/rewards-pay/compound-earnings-page'
+import { redirect } from 'next/navigation'
 
-export const metadata: Metadata = {
-  title: 'Compound Earnings',
-  description:
-    'Member-only compounding inside Centuries Mutual — growth locked to your verified identity.',
-}
-
-export default function CompoundEarningsPage() {
-  return <CompoundEarningsPageView />
+/** Legacy path — Compound Earnings now lives at /compoundearnings. */
+export default function RentalEquityRedirect() {
+  redirect('/compoundearnings')
 }

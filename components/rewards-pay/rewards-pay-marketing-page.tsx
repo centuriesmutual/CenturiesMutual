@@ -50,6 +50,8 @@ export type RewardsPayMarketingPageProps = {
   illustration?: ReactNode
   ctaLabel?: string
   ctaHref?: string
+  /** Solid deep-green hero with no radial/linear gradient overlays. */
+  flatHero?: boolean
 }
 
 export function RewardsPayMarketingPage({
@@ -72,6 +74,7 @@ export function RewardsPayMarketingPage({
   illustration,
   ctaLabel = 'Create Account',
   ctaHref = '/createaccount',
+  flatHero = false,
 }: RewardsPayMarketingPageProps) {
   const hasIllustration = Boolean(illustration)
 
@@ -79,31 +82,34 @@ export function RewardsPayMarketingPage({
     <>
       <SiteHeader />
       <main className="m-0 block overflow-x-hidden bg-[#FAFCFB] p-0">
-        <section className="relative isolate min-h-[min(92dvh,820px)] overflow-hidden bg-[#071A12]">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: `
+        <section className="relative isolate min-h-[min(92dvh,820px)] overflow-hidden bg-[#0F3D2E]">
+          {!flatHero ? (
+            <>
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background: `
                 radial-gradient(ellipse 90% 70% at 12% -10%, rgba(19,75,116,0.45) 0%, transparent 55%),
                 radial-gradient(ellipse 70% 60% at 88% 20%, rgba(15,61,46,0.9) 0%, transparent 50%),
                 radial-gradient(ellipse 50% 40% at 50% 100%, rgba(201,169,97,0.14) 0%, transparent 45%),
                 linear-gradient(165deg, #071A12 0%, #0F3D2E 48%, #0A2E22 100%)
               `,
-            }}
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-[0.14]"
-            style={{
-              backgroundImage:
-                'linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)',
-              backgroundSize: '48px 48px',
-              maskImage:
-                'radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 75%)',
-            }}
-          />
-
+                }}
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-[0.14]"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)',
+                  backgroundSize: '48px 48px',
+                  maskImage:
+                    'radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 75%)',
+                }}
+              />
+            </>
+          ) : null}
           <div
             className={`relative mx-auto grid min-h-[min(92dvh,820px)] max-w-7xl items-center gap-8 px-4 py-20 sm:px-6 lg:gap-10 lg:px-8 lg:py-28 ${
               hasIllustration ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'

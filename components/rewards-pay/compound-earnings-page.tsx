@@ -103,6 +103,7 @@ export function CompoundEarningsPageView() {
       scopeTitle="What Compound Earnings is — and is not"
       scopeBody="A membership view of compounding on supplemental rewards balances inside Centuries Mutual. Not an offer of securities, not tax advice, and not a guarantee of any rate or future value. Outcomes are governed by program rules and applicable plan documents."
       illustration={<CompoundEarnings3D />}
+      flatHero
     />
   )
 }

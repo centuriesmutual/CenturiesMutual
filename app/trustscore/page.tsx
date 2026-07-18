@@ -274,7 +274,7 @@ export default function TrustScore() {
 
                 {/* CTA Section */}
                 <div className="text-center">
-                  <Link href="/rentalequity" className="btn btn-primary btn-lg px-5 py-3 fw-bold me-3">
+                  <Link href="/compoundearnings" className="btn btn-primary btn-lg px-5 py-3 fw-bold me-3">
                     Learn More About Rental Equity
                   </Link>
                   <Link href="/contact" className="btn btn-outline-primary btn-lg px-5 py-3 fw-bold">
