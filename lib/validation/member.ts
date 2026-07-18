@@ -10,6 +10,10 @@ const PHONE = z
   .string()
   .trim()
   .transform((v) => v.replace(/\D/g, ''))
+  .refine((v) => v.length === 0 || v.length === 10 || v.length === 11, {
+    message: 'Please enter a valid US phone number.',
+  })
+  .transform((v) => (v.length === 11 && v.startsWith('1') ? v.slice(1) : v))
   .refine((v) => v.length === 0 || v.length === 10, {
     message: 'Please enter a 10-digit phone number.',
   })

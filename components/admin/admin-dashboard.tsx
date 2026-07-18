@@ -267,7 +267,7 @@ export function AdminDashboard({
   email: string | null
   onSignOut: () => void | Promise<void>
 }) {
-  const [workspace, setWorkspace] = useState<WorkspaceId>('overview')
+  const [workspace, setWorkspace] = useState<WorkspaceId>('files')
   const [folder, setFolder] = useState<FileFolderId>('all')
   const [employeePanel, setEmployeePanel] = useState<EmployeePanelId>('overview')
   const [opsPanel, setOpsPanel] = useState<'flags' | 'states'>('flags')
