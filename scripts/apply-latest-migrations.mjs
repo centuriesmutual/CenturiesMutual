@@ -34,6 +34,8 @@ const migrations = [
   '20260718000000_career_listings.sql',
   '20260719000000_aca_enrollment_flags.sql',
   '20260720000000_aca_enroll_next_month_rate.sql',
+  '20260721000000_application_conversations.sql',
+  '20260722000000_office_calendar_and_mailbox.sql',
 ]
 
 const rawConnectionString =

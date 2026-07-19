@@ -2,6 +2,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { requireAdmin } from '@/lib/admin/access'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { jsonError } from '@/lib/supabase/auth-helpers'
+import {
+  ensureApplicationConversation,
+  ensureMember,
+  postSystemMessage,
+  staffRoleFromEmail,
+} from '@/lib/conversations/server'
+import { adminEmails } from '@/lib/admin/access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -41,18 +48,30 @@ export async function GET() {
   return NextResponse.json({ ok: true, applications: data ?? [] })
 }
 
-/** PATCH — update application status and/or notes. Admin-gated. */
+type ApplicationPatchBody = {
+  id?: string
+  application_status?: string
+  notes?: string | null
+  first_name?: string
+  last_name?: string
+  email?: string
+  phone?: string | null
+  date_of_birth?: string | null
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  plan_type?: string | null
+}
+
+/** PATCH — update application status, notes, and/or profile fields. Admin-gated. */
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin()
   if (auth.error) return auth.error
 
-  let body: { id?: string; application_status?: string; notes?: string | null }
+  let body: ApplicationPatchBody
   try {
-    body = (await req.json()) as {
-      id?: string
-      application_status?: string
-      notes?: string | null
-    }
+    body = (await req.json()) as ApplicationPatchBody
   } catch {
     return jsonError('Invalid JSON body.')
   }
@@ -62,7 +81,7 @@ export async function PATCH(req: NextRequest) {
     return jsonError('A valid application id is required.', 400)
   }
 
-  const patch: { application_status?: string; notes?: string | null } = {}
+  const patch: Record<string, string | null> = {}
 
   if (body.application_status !== undefined) {
     const status = body.application_status?.trim()
@@ -76,11 +95,60 @@ export async function PATCH(req: NextRequest) {
     patch.notes = body.notes
   }
 
+  const optionalText = (key: keyof ApplicationPatchBody, allowEmptyAsNull = true) => {
+    if (body[key] === undefined) return
+    const raw = typeof body[key] === 'string' ? (body[key] as string).trim() : ''
+    patch[key] = raw || (allowEmptyAsNull ? null : raw)
+  }
+
+  if (body.first_name !== undefined) {
+    const first_name = typeof body.first_name === 'string' ? body.first_name.trim() : ''
+    if (!first_name) return jsonError('First name is required.', 400)
+    patch.first_name = first_name
+  }
+
+  if (body.last_name !== undefined) {
+    const last_name = typeof body.last_name === 'string' ? body.last_name.trim() : ''
+    if (!last_name) return jsonError('Last name is required.', 400)
+    patch.last_name = last_name
+  }
+
+  if (body.email !== undefined) {
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return jsonError('Enter a valid email address.', 400)
+    }
+    patch.email = email
+  }
+
+  optionalText('phone')
+  optionalText('date_of_birth')
+  optionalText('address')
+  optionalText('city')
+  optionalText('plan_type')
+  optionalText('zip')
+
+  if (body.state !== undefined) {
+    const stateRaw = typeof body.state === 'string' ? body.state.trim().toUpperCase() : ''
+    patch.state = stateRaw.length === 2 ? stateRaw : stateRaw || null
+  }
+
   if (Object.keys(patch).length === 0) {
-    return jsonError('Provide application_status and/or notes to update.', 400)
+    return jsonError('Provide fields to update.', 400)
   }
 
   const supabase = createServiceClient()
+
+  let previousStatus: string | null = null
+  if (body.application_status !== undefined) {
+    const { data: prev } = await supabase
+      .from('insurance_applications')
+      .select('application_status')
+      .eq('id', id)
+      .maybeSingle()
+    previousStatus = prev?.application_status ?? null
+  }
+
   const { data, error } = await supabase
     .from('insurance_applications')
     .update(patch)
@@ -89,6 +157,33 @@ export async function PATCH(req: NextRequest) {
     .single()
 
   if (error) return jsonError(error.message, 500)
+
+  const convo = await ensureApplicationConversation({
+    applicationId: id,
+    createdAt: data?.created_at,
+  })
+
+  if (convo && auth.user) {
+    await ensureMember(
+      convo.id,
+      auth.user.id,
+      staffRoleFromEmail(auth.user.email, adminEmails()),
+    )
+  }
+
+  if (
+    convo &&
+    body.application_status !== undefined &&
+    previousStatus &&
+    previousStatus !== body.application_status
+  ) {
+    const label = String(body.application_status).replace(/_/g, ' ')
+    await postSystemMessage(
+      convo.id,
+      `Status updated: ${previousStatus.replace(/_/g, ' ')} → ${label}`,
+      'status',
+    )
+  }
 
   return NextResponse.json({ ok: true, application: data })
 }
@@ -171,6 +266,29 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return jsonError(error.message, 500)
+
+  await ensureApplicationConversation({
+    applicationId: data.id,
+    createdAt: data.created_at,
+    systemMessage: 'Application submitted',
+  })
+
+  if (auth.user) {
+    const supabase2 = createServiceClient()
+    const { data: convo } = await supabase2
+      .from('conversations')
+      .select('id')
+      .eq('application_id', data.id)
+      .is('archived_at', null)
+      .maybeSingle()
+    if (convo) {
+      await ensureMember(
+        convo.id,
+        auth.user.id,
+        staffRoleFromEmail(auth.user.email, adminEmails()),
+      )
+    }
+  }
 
   return NextResponse.json({ ok: true, application: data }, { status: 201 })
 }

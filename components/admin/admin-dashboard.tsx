@@ -2,11 +2,35 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, RefreshCw, LogOut, SlidersHorizontal, Phone, PhoneOff, Mic, MicOff } from 'lucide-react'
+import {
+  Settings,
+  RefreshCw,
+  LogOut,
+  SlidersHorizontal,
+  Phone,
+  PhoneOff,
+  Mic,
+  MicOff,
+  Lock,
+  LockOpen,
+  Plus,
+  StickyNote,
+  Mail,
+  Eye,
+  EyeOff,
+} from 'lucide-react'
 import {
   AcaEnrollmentFlagsPanel,
   AcaStateLicensingPanel,
 } from '@/components/admin/aca-flags-panels'
+import {
+  ConversationViewModal,
+} from '@/components/admin/application-conversations'
+import { MailboxPanel } from '@/components/admin/mailbox-panel'
+import { IntelligenceDashboard } from '@/components/admin/intelligence-dashboard'
+import { WorkforceDashboard } from '@/components/admin/workforce-dashboard'
+import { ContractingPanel } from '@/components/admin/contracting-panel'
+import { createClient } from '@/lib/supabase/client'
 
 /* ---------------------------------------------------------------------------
  * Types
@@ -93,9 +117,18 @@ type AcaState = {
   status: string
 }
 
-type WorkspaceId = 'overview' | 'clients' | 'leads' | 'files' | 'employees' | 'intelligence' | 'operations' | 'ledger'
+type WorkspaceId =
+  | 'overview'
+  | 'clients'
+  | 'leads'
+  | 'files'
+  | 'mailbox'
+  | 'employees'
+  | 'intelligence'
+  | 'operations'
+  | 'ledger'
 type FileFolderId = 'all' | 'aca' | 'medicare' | 'enrolled' | 'other'
-type WorkforceView = 'directory' | 'hiring' | 'job-board'
+type WorkforceView = 'command' | 'directory' | 'hiring' | 'job-board' | 'contracting'
 
 const APPLICATION_STATUSES = [
   'submitted',
@@ -144,6 +177,7 @@ const NAV_TABS: { id: Exclude<WorkspaceId, 'operations'>; label: string }[] = [
   { id: 'clients', label: 'Clients' },
   { id: 'leads', label: 'Leads' },
   { id: 'files', label: 'Applications' },
+  { id: 'mailbox', label: 'Mailbox' },
   { id: 'employees', label: 'Workforce' },
   { id: 'intelligence', label: 'Intelligence' },
   { id: 'ledger', label: 'Ledger' },
@@ -182,27 +216,6 @@ function planTypeCategory(
   if (isAcaApplication(a)) return 'ACA'
   if (isMedicareApplication(a)) return 'Medicare Advantage'
   return null
-}
-
-function HorseIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M4 16c1.2-2.5 2-5.2 2.2-7.2.2-1.6 1.2-2.8 2.8-3.2 1.1-.3 2.2 0 3 .7l1.2 1.1c.5.5 1.2.7 1.9.6l2.2-.3c1.3-.2 2.5.7 2.8 2 .2.8 0 1.6-.5 2.2L17 14.5" />
-      <path d="M6.5 9.5c.8.2 1.5.8 1.8 1.6" />
-      <path d="M9 18.5v-3.2c0-1.2.6-2.3 1.6-2.9L14 10" />
-      <path d="M11.5 18.5h5.2c1.3 0 2.3-1.1 2.1-2.4l-.4-2.1" />
-      <path d="M8.2 6.2 7 4.8" />
-    </svg>
-  )
 }
 
 function fmtDate(iso?: string | null) {
@@ -248,6 +261,7 @@ function parseEnrollmentNotes(notes: string | null | undefined) {
       applicant?: {
         ssn?: string
         ssn_last4?: string
+        mbi?: string
         sex?: string
         tobacco?: string
       }
@@ -260,9 +274,33 @@ function parseEnrollmentNotes(notes: string | null | undefined) {
       agent_id?: string
       lead_id?: string
       marketing_id?: string
+      policy_id?: string
       coverage_start?: string
       plan_type?: string
       ssn_masked?: string
+      plan_details?: {
+        plan_name?: string
+        carrier?: string
+        plan_id?: string
+        contract_id?: string
+        pbp?: string
+        premium?: string
+        deductible?: string
+        coverage_start?: string
+        coverage_end?: string
+        network?: string
+        metal_tier?: string
+        group_number?: string
+        rx_bin?: string
+        notes?: string
+      }
+      preferred_id?: 'ssn' | 'mbi'
+      mailing?: {
+        address?: string
+        city?: string
+        state?: string
+        zip?: string
+      }
     }
     if (!parsed || typeof parsed !== 'object') return null
     return parsed
@@ -298,14 +336,261 @@ function getDirectoryNotes(notes: string | null | undefined) {
 }
 
 function getAgentOfRecord(notes: string | null | undefined) {
+  return getLastSpokenAgent(notes) || getStoredAgentId(notes)
+}
+
+function getStoredAgentId(notes: string | null | undefined) {
   const parsed = parseEnrollmentNotes(notes)
-  return (
-    parsed?.agent_id ||
-    parsed?.producer_id ||
-    parsed?.lead_id ||
-    parsed?.marketing_id ||
-    ''
+  return parsed?.agent_id || parsed?.producer_id || parsed?.marketing_id || ''
+}
+
+function getLeadId(notes: string | null | undefined) {
+  const parsed = parseEnrollmentNotes(notes)
+  return parsed?.lead_id || ''
+}
+
+function withLeadId(existing: string | null | undefined, leadId: string) {
+  const parsed = ensureNotesObject(existing)
+  const trimmed = leadId.trim()
+  if (!trimmed) {
+    delete parsed.lead_id
+  } else {
+    parsed.lead_id = trimmed
+  }
+  return JSON.stringify(parsed)
+}
+
+const NO_PICKUP_DISPOSITION_LABELS = [
+  'no answer',
+  'left voicemail',
+  'disconnected / wrong number',
+  'disconnected',
+  'wrong number',
+]
+
+function wasClientPickupCall(detail?: string) {
+  if (!detail) return false
+  const labelMatch = detail.match(/^Disposition:\s*([^·]+)/i)
+  const label = (labelMatch?.[1] || detail).trim().toLowerCase()
+  return !NO_PICKUP_DISPOSITION_LABELS.some(
+    (blocked) => label === blocked || label.startsWith(blocked),
   )
+}
+
+function getLastSpokenAgent(notes: string | null | undefined) {
+  for (const entry of getMicroLedger(notes)) {
+    if (entry.action !== 'call_disposition') continue
+    if (!wasClientPickupCall(entry.detail)) continue
+    if (!entry.actor?.trim()) continue
+    return entry.actor.trim()
+  }
+  return ''
+}
+
+function formatAgentDisplay(actor: string) {
+  const trimmed = actor.trim()
+  if (!trimmed) return ''
+  if (trimmed.includes('@')) return trimmed.split('@')[0] || trimmed
+  return trimmed
+}
+
+function getPolicyId(notes: string | null | undefined) {
+  const parsed = parseEnrollmentNotes(notes)
+  return parsed?.policy_id || ''
+}
+
+function withPolicyId(existing: string | null | undefined, policyId: string) {
+  const parsed = ensureNotesObject(existing)
+  const trimmed = policyId.trim()
+  if (!trimmed) {
+    delete parsed.policy_id
+  } else {
+    parsed.policy_id = trimmed
+  }
+  return JSON.stringify(parsed)
+}
+
+function withFullSsn(existing: string | null | undefined, ssn: string) {
+  const parsed = ensureNotesObject(existing)
+  const digits = ssn.replace(/\D/g, '')
+  const applicant =
+    parsed.applicant && typeof parsed.applicant === 'object'
+      ? { ...(parsed.applicant as Record<string, unknown>) }
+      : {}
+  if (!digits) {
+    delete applicant.ssn
+    delete applicant.ssn_last4
+  } else if (digits.length === 9) {
+    applicant.ssn = formatSsnDigits(digits)
+    applicant.ssn_last4 = digits.slice(-4)
+  } else {
+    return JSON.stringify(parsed)
+  }
+  if (Object.keys(applicant).length === 0) {
+    delete parsed.applicant
+  } else {
+    parsed.applicant = applicant
+  }
+  return JSON.stringify(parsed)
+}
+
+function getMbi(notes: string | null | undefined) {
+  const parsed = parseEnrollmentNotes(notes)
+  return parsed?.applicant?.mbi || ''
+}
+
+function withMbi(existing: string | null | undefined, mbi: string) {
+  const parsed = ensureNotesObject(existing)
+  const trimmed = mbi.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11)
+  const applicant =
+    parsed.applicant && typeof parsed.applicant === 'object'
+      ? { ...(parsed.applicant as Record<string, unknown>) }
+      : {}
+  if (!trimmed) {
+    delete applicant.mbi
+  } else {
+    applicant.mbi = formatMbiInput(trimmed)
+  }
+  if (Object.keys(applicant).length === 0) {
+    delete parsed.applicant
+  } else {
+    parsed.applicant = applicant
+  }
+  return JSON.stringify(parsed)
+}
+
+function getPreferredId(notes: string | null | undefined): 'ssn' | 'mbi' {
+  const parsed = parseEnrollmentNotes(notes)
+  if (parsed?.preferred_id === 'mbi' || parsed?.preferred_id === 'ssn') {
+    return parsed.preferred_id
+  }
+  if (getMbi(notes) && !getFullSsn(notes)) return 'mbi'
+  return 'ssn'
+}
+
+function withPreferredId(existing: string | null | undefined, preferred: 'ssn' | 'mbi') {
+  const parsed = ensureNotesObject(existing)
+  parsed.preferred_id = preferred
+  return JSON.stringify(parsed)
+}
+
+type MailingAddress = {
+  address: string
+  city: string
+  state: string
+  zip: string
+}
+
+function getMailingAddress(notes: string | null | undefined): MailingAddress {
+  const parsed = parseEnrollmentNotes(notes)
+  return {
+    address: parsed?.mailing?.address || '',
+    city: parsed?.mailing?.city || '',
+    state: parsed?.mailing?.state || '',
+    zip: parsed?.mailing?.zip || '',
+  }
+}
+
+function withMailingAddress(existing: string | null | undefined, mailing: MailingAddress) {
+  const parsed = ensureNotesObject(existing)
+  const next = {
+    address: mailing.address.trim(),
+    city: mailing.city.trim(),
+    state: mailing.state.trim().toUpperCase(),
+    zip: mailing.zip.trim(),
+  }
+  if (!next.address && !next.city && !next.state && !next.zip) {
+    delete parsed.mailing
+  } else {
+    parsed.mailing = next
+  }
+  return JSON.stringify(parsed)
+}
+
+function formatCombinedAddress(app: Pick<Application, 'address' | 'city' | 'state' | 'zip'>) {
+  return [app.address, app.city, app.state, app.zip].filter(Boolean).join(', ')
+}
+
+function parseCombinedAddress(
+  line: string,
+  previous: Pick<Application, 'address' | 'city' | 'state' | 'zip'>,
+) {
+  const parts = line
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (parts.length >= 4) {
+    return {
+      address: parts.slice(0, -3).join(', ') || null,
+      city: parts[parts.length - 3] || null,
+      state: parts[parts.length - 2]?.toUpperCase() || null,
+      zip: parts[parts.length - 1] || null,
+    }
+  }
+  if (parts.length === 3) {
+    const last = parts[2]
+    const m = last.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/)
+    if (m) {
+      return {
+        address: parts[0] || null,
+        city: parts[1] || null,
+        state: m[1].toUpperCase(),
+        zip: m[2],
+      }
+    }
+    return {
+      address: parts[0] || null,
+      city: parts[1] || null,
+      state: last.toUpperCase().slice(0, 2) || null,
+      zip: previous.zip,
+    }
+  }
+  return {
+    address: line.trim() || null,
+    city: previous.city,
+    state: previous.state,
+    zip: previous.zip,
+  }
+}
+
+type DirectoryFieldDraft = {
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  date_of_birth: string
+  plan_type: string
+  address: string
+  city: string
+  state: string
+  zip: string
+  lead_id: string
+  policy_id: string
+  ssn: string
+  mbi: string
+  preferred_id: 'ssn' | 'mbi'
+}
+
+function directoryDraftFromApp(app: Application): DirectoryFieldDraft {
+  const fullSsn = getFullSsn(app.notes)
+  const ssnDigits = fullSsn.replace(/\D/g, '')
+  return {
+    first_name: app.first_name || '',
+    last_name: app.last_name || '',
+    email: app.email || '',
+    phone: formatPhoneInput(app.phone || ''),
+    date_of_birth: formatDobDisplay(app.date_of_birth),
+    plan_type: app.plan_type || '',
+    address: app.address || '',
+    city: app.city || '',
+    state: formatStateInput(app.state || ''),
+    zip: formatZipInput(app.zip || ''),
+    lead_id: getLeadId(app.notes),
+    policy_id: getPolicyId(app.notes),
+    ssn: ssnDigits.length === 9 ? formatSsnDigits(ssnDigits) : fullSsn.includes('*') ? fullSsn : formatSsnInput(fullSsn),
+    mbi: formatMbiInput(getMbi(app.notes)),
+    preferred_id: getPreferredId(app.notes),
+  }
 }
 
 function getNotesHistory(notes: string | null | undefined): { at: string; text: string }[] {
@@ -518,11 +803,197 @@ function withDirectoryNotes(existing: string | null | undefined, directoryNotes:
 }
 
 function normalizePhone(phone: string | null | undefined) {
-  return (phone || '').replace(/\D/g, '')
+  return (phone || '').replace(/\D/g, '').slice(0, 10)
+}
+
+function formatPhoneInput(value: string) {
+  const d = normalizePhone(value)
+  if (d.length === 0) return ''
+  if (d.length <= 3) return `(${d}`
+  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+}
+
+function formatSsnInput(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 9)
+  if (d.length <= 3) return d
+  if (d.length <= 5) return `${d.slice(0, 3)}-${d.slice(3)}`
+  return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`
+}
+
+function formatMbiInput(value: string) {
+  const clean = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11)
+  if (clean.length <= 4) return clean
+  if (clean.length <= 7) return `${clean.slice(0, 4)}-${clean.slice(4)}`
+  return `${clean.slice(0, 4)}-${clean.slice(4, 7)}-${clean.slice(7)}`
+}
+
+function parseDobParts(value: string | null | undefined): { month: string; day: string; year: string } {
+  const raw = (value || '').trim()
+  let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (m) {
+    return {
+      year: m[1],
+      month: m[2].padStart(2, '0'),
+      day: m[3].padStart(2, '0'),
+    }
+  }
+  m = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/)
+  if (m) {
+    return {
+      month: m[1].padStart(2, '0'),
+      day: m[2].padStart(2, '0'),
+      year: m[3],
+    }
+  }
+  return { month: '', day: '', year: '' }
+}
+
+function joinDobParts(month: string, day: string, year: string) {
+  if (!month || !day || !year || year.length !== 4) return ''
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+}
+
+function formatDobInput(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 8)
+  if (d.length <= 2) return d
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`
+}
+
+function formatDobDisplay(value: string | null | undefined) {
+  const parts = parseDobParts(value)
+  if (parts.month && parts.day && parts.year) {
+    return `${parts.month}/${parts.day}/${parts.year}`
+  }
+  if (!value) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return ''
+  return formatDobInput(value)
+}
+
+function dobToStorage(display: string) {
+  const parts = parseDobParts(display)
+  return joinDobParts(parts.month, parts.day, parts.year)
+}
+
+type PlanDetails = {
+  plan_name: string
+  carrier: string
+  plan_id: string
+  contract_id: string
+  pbp: string
+  premium: string
+  deductible: string
+  coverage_start: string
+  coverage_end: string
+  network: string
+  metal_tier: string
+  group_number: string
+  rx_bin: string
+  notes: string
+}
+
+function emptyPlanDetails(): PlanDetails {
+  return {
+    plan_name: '',
+    carrier: '',
+    plan_id: '',
+    contract_id: '',
+    pbp: '',
+    premium: '',
+    deductible: '',
+    coverage_start: '',
+    coverage_end: '',
+    network: '',
+    metal_tier: '',
+    group_number: '',
+    rx_bin: '',
+    notes: '',
+  }
+}
+
+function getPlanDetails(notes: string | null | undefined, planType?: string | null): PlanDetails {
+  const parsed = parseEnrollmentNotes(notes)
+  const raw = parsed?.plan_details
+  const base = emptyPlanDetails()
+  if (!raw || typeof raw !== 'object') {
+    return { ...base, plan_name: planType || '' }
+  }
+  return {
+    plan_name: raw.plan_name || planType || '',
+    carrier: raw.carrier || '',
+    plan_id: raw.plan_id || '',
+    contract_id: raw.contract_id || '',
+    pbp: raw.pbp || '',
+    premium: raw.premium || '',
+    deductible: raw.deductible || '',
+    coverage_start: raw.coverage_start || parsed?.household?.coverage_start || parsed?.coverage_start || '',
+    coverage_end: raw.coverage_end || '',
+    network: raw.network || '',
+    metal_tier: raw.metal_tier || '',
+    group_number: raw.group_number || '',
+    rx_bin: raw.rx_bin || '',
+    notes: raw.notes || '',
+  }
+}
+
+function withPlanDetails(existing: string | null | undefined, details: PlanDetails) {
+  const parsed = ensureNotesObject(existing)
+  const cleaned = Object.fromEntries(
+    Object.entries(details).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v]),
+  ) as PlanDetails
+  const hasAny = Object.values(cleaned).some((v) => Boolean(v))
+  if (!hasAny) {
+    delete parsed.plan_details
+  } else {
+    parsed.plan_details = cleaned
+  }
+  if (cleaned.coverage_start) {
+    const household =
+      parsed.household && typeof parsed.household === 'object'
+        ? { ...(parsed.household as Record<string, unknown>) }
+        : {}
+    household.coverage_start = cleaned.coverage_start
+    parsed.household = household
+  }
+  return JSON.stringify(parsed)
 }
 
 function normalizeEmail(email: string | null | undefined) {
   return (email || '').trim().toLowerCase()
+}
+
+const US_STATE_CODES = new Set([
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS',
+  'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY',
+  'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
+  'WI', 'WY', 'DC',
+])
+
+function isValidDirectoryEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email.trim())
+}
+
+function formatZipInput(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 9)
+  if (d.length <= 5) return d
+  return `${d.slice(0, 5)}-${d.slice(5)}`
+}
+
+function isValidZip(zip: string) {
+  const t = zip.trim()
+  if (!t) return true
+  return /^\d{5}(-\d{4})?$/.test(t)
+}
+
+function formatStateInput(value: string) {
+  return value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2)
+}
+
+function isValidState(state: string) {
+  const t = state.trim().toUpperCase()
+  if (!t) return true
+  return US_STATE_CODES.has(t)
 }
 
 function sourceLabel(a: Application) {
@@ -570,26 +1041,16 @@ function enrollmentBadge(status: string, opts?: { onClick?: () => void; title?: 
 
 function buildEnrollmentEvents(app: Application) {
   const detail = parseEnrollmentNotes(app.notes)
-  const agentId = getAgentOfRecord(app.notes)
   const events: { at: string; title: string; detail: string }[] = [
     {
       at: app.created_at,
-      title: 'Application submitted',
-      detail: `${sourceLabel(app)}${app.plan_type ? ` · ${app.plan_type}` : ''}`,
-    },
-    {
-      at: app.created_at,
-      title: `Status · ${app.application_status.replace(/_/g, ' ')}`,
-      detail: `Application ID ${app.id}`,
+      title: `Application submitted · ${app.application_status.replace(/_/g, ' ')}`,
+      detail: [
+        `${sourceLabel(app)}${app.plan_type ? ` · ${app.plan_type}` : ''}`,
+        `Application ID ${app.id}`,
+      ].join('\n'),
     },
   ]
-  if (agentId) {
-    events.push({
-      at: app.created_at,
-      title: 'Agent of Record',
-      detail: agentId,
-    })
-  }
   if (detail?.enrollment_period) {
     events.push({
       at: app.created_at,
@@ -733,7 +1194,7 @@ function EnrollmentHistoryModal({
                   <p className="m-0 mt-0.5 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
                     {ev.title}
                   </p>
-                  <p className="m-0 mt-0.5 break-words font-sans text-[0.75rem] text-[#55655D]">
+                  <p className="m-0 mt-0.5 whitespace-pre-wrap break-words font-sans text-[0.75rem] text-[#55655D]">
                     {ev.detail}
                   </p>
                 </li>
@@ -990,25 +1451,6 @@ export function AdminDashboard({
     return byStatus
   }, [careers])
 
-  const salesStats = useMemo(() => {
-    const bySource: Record<string, number> = {}
-    const byStatus: Record<string, number> = {}
-    const byState: Record<string, number> = {}
-    let last7 = 0
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-    for (const a of applications) {
-      const src = sourceLabel(a)
-      bySource[src] = (bySource[src] ?? 0) + 1
-      byStatus[a.application_status] = (byStatus[a.application_status] ?? 0) + 1
-      if (a.state) byState[a.state] = (byState[a.state] ?? 0) + 1
-      if (new Date(a.created_at).getTime() >= weekAgo) last7 += 1
-    }
-    const enrolled = enrollments.length
-    const conversion =
-      applications.length > 0 ? Math.round((enrolled / applications.length) * 100) : 0
-    return { bySource, byStatus, byState, last7, conversion, enrolled }
-  }, [applications, enrollments.length])
-
   const updateStatus = async (id: string, application_status: string) => {
     setFlash(null)
     const app = applications.find((a) => a.id === id)
@@ -1065,6 +1507,43 @@ export function AdminDashboard({
       prev.map((a) => (a.id === id ? { ...a, notes: data.application?.notes ?? notes } : a)),
     )
     setFlash('Client notes saved.')
+    return true
+  }
+
+  const updateApplicationRecord = async (
+    id: string,
+    patch: Partial<
+      Pick<
+        Application,
+        | 'first_name'
+        | 'last_name'
+        | 'email'
+        | 'phone'
+        | 'date_of_birth'
+        | 'address'
+        | 'city'
+        | 'state'
+        | 'zip'
+        | 'plan_type'
+        | 'notes'
+      >
+    >,
+  ) => {
+    setFlash(null)
+    const res = await fetch('/api/admin/applications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...patch }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data?.ok) {
+      setFlash(data?.error || 'Could not save client record.')
+      return false
+    }
+    setApplications((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...(data.application as Application) } : a)),
+    )
+    setFlash('Client record saved.')
     return true
   }
 
@@ -1256,7 +1735,9 @@ export function AdminDashboard({
                       applications={applications}
                       actorEmail={email}
                       onSaveNotes={updateApplicationNotes}
+                      onSaveRecord={updateApplicationRecord}
                       onAudit={recordApplicationAudit}
+                      onFlash={setFlash}
                     />
                   )}
 
@@ -1267,6 +1748,8 @@ export function AdminDashboard({
                       onAudit={recordApplicationAudit}
                     />
                   )}
+
+                  {workspace === 'mailbox' && <MailboxPanel actorEmail={email} />}
 
                   {workspace === 'files' && (
                     <FilesWorkspace
@@ -1287,8 +1770,9 @@ export function AdminDashboard({
                   )}
 
                   {workspace === 'employees' && (
-                    <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
                       <EmployeesWorkspace
+                        applications={applications}
                         careers={careers}
                         listings={listings}
                         hiringStats={hiringStats}
@@ -1300,13 +1784,10 @@ export function AdminDashboard({
                   )}
 
                   {workspace === 'intelligence' && (
-                    <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-                      <SalesMarketingPanel
-                        sales={salesStats}
-                        counts={folderCounts}
-                        acaCount={acaApplications.length}
-                        medicareCount={medicareApplications.length}
-                        enrolledCount={enrollments.length}
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+                      <IntelligenceDashboard
+                        applications={applications}
+                        careers={careers}
                       />
                     </div>
                   )}
@@ -1385,29 +1866,23 @@ function DuplicateFieldMark({ message }: { message: string }) {
   )
 }
 
-function DirectoryHistoryModal({
+function MailingAddressModal({
   app,
   onClose,
+  onSave,
 }: {
   app: Application
   onClose: () => void
+  onSave: (mailing: MailingAddress) => Promise<boolean>
 }) {
-  const currentNotes = getDirectoryNotes(app.notes)
-  const notesHistory = getNotesHistory(app.notes)
-  const microLedger = getMicroLedger(app.notes)
-
-  const enrollmentEvents = useMemo(() => buildEnrollmentEvents(app), [app])
-
-  const noteEntries = useMemo(() => {
-    const entries: { at: string; text: string; current?: boolean }[] = []
-    if (currentNotes.trim()) {
-      entries.push({ at: new Date().toISOString(), text: currentNotes, current: true })
-    }
-    for (const h of notesHistory) {
-      entries.push({ at: h.at, text: h.text })
-    }
-    return entries
-  }, [currentNotes, notesHistory])
+  const existing = getMailingAddress(app.notes)
+  const [draft, setDraft] = useState<MailingAddress>(() => ({
+    ...existing,
+    state: formatStateInput(existing.state),
+    zip: formatZipInput(existing.zip),
+  }))
+  const [saving, setSaving] = useState(false)
+  const [localError, setLocalError] = useState<string | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1417,27 +1892,218 @@ function DirectoryHistoryModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  const copyResidential = () => {
+    setDraft({
+      address: app.address || '',
+      city: app.city || '',
+      state: formatStateInput(app.state || ''),
+      zip: formatZipInput(app.zip || ''),
+    })
+    setLocalError(null)
+  }
+
+  const save = async () => {
+    const state = formatStateInput(draft.state)
+    const zip = formatZipInput(draft.zip)
+    if (state && !isValidState(state)) {
+      setLocalError('Enter a valid 2-letter US state code.')
+      return
+    }
+    if (zip && !isValidZip(zip)) {
+      setLocalError('ZIP must be 5 digits, or ZIP+4 (12345-6789).')
+      return
+    }
+    setLocalError(null)
+    setSaving(true)
+    try {
+      const ok = await onSave({ ...draft, state, zip })
+      if (ok) onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const field =
+    'w-full rounded-[10px] border border-[#0F3D2E]/20 bg-white px-2.5 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E]/45'
+
   return (
-    <div
+    <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F3D2E]/45 p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="directory-history-title"
+      aria-labelledby="mailing-address-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       onClick={onClose}
     >
-      <div
-        className="flex max-h-[min(88vh,640px)] w-full max-w-2xl flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+      <motion.div
+        className="w-full max-w-md overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.98 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3 sm:px-5">
+        <div className="flex items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3">
           <div>
             <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-              Client history
+              Mailing address
             </p>
             <h2
-              id="directory-history-title"
+              id="mailing-address-title"
               className="m-0 mt-0.5 font-medium text-[#0F3D2E]"
-              style={{ ...displayFont, fontSize: '1.2rem' }}
+              style={{ ...displayFont, fontSize: '1.1rem' }}
+            >
+              {app.first_name} {app.last_name}
+            </h2>
+            <p className="m-0 mt-1 font-sans text-[0.6875rem] text-[#55655D]">
+              Separate from residential address on the record
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[8px] border-0 bg-transparent px-2 py-1 font-sans text-[0.8125rem] font-semibold text-[#55655D] hover:bg-[#0F3D2E]/[0.06]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="space-y-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={copyResidential}
+            className="rounded-[8px] border border-[#0F3D2E]/20 bg-white px-2.5 py-1.5 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] hover:bg-[#FAFCFB]"
+          >
+            Copy from residential address
+          </button>
+          <label className="block">
+            <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+              Street
+            </span>
+            <input
+              className={field}
+              value={draft.address}
+              onChange={(e) => setDraft((d) => ({ ...d, address: e.target.value }))}
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <label className="col-span-1 block sm:col-span-1">
+              <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                City
+              </span>
+              <input
+                className={field}
+                value={draft.city}
+                onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                State
+              </span>
+              <input
+                className={field}
+                value={draft.state}
+                maxLength={2}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, state: formatStateInput(e.target.value) }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                ZIP
+              </span>
+              <input
+                className={field}
+                value={draft.zip}
+                inputMode="numeric"
+                maxLength={10}
+                onChange={(e) => setDraft((d) => ({ ...d, zip: formatZipInput(e.target.value) }))}
+              />
+            </label>
+          </div>
+          {localError ? (
+            <p className="m-0 font-sans text-[0.75rem] text-[#8B3A3A]">{localError}</p>
+          ) : null}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void save()}
+              className="rounded-[10px] bg-[#0F3D2E] px-4 py-1.5 font-sans text-[0.75rem] font-semibold text-[#E8DFD6] disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save mailing address'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function PlanDetailsModal({
+  app,
+  onClose,
+  onSave,
+}: {
+  app: Application
+  onClose: () => void
+  onSave: (details: PlanDetails, planType: string) => Promise<boolean>
+}) {
+  const [draft, setDraft] = useState(() => getPlanDetails(app.notes, app.plan_type))
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const ok = await onSave(draft, draft.plan_name || app.plan_type || '')
+      if (ok) onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const field =
+    'w-full rounded-[10px] border border-[#0F3D2E]/20 bg-white px-2.5 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E]/45'
+  const setField = (key: keyof PlanDetails) => (e: { target: { value: string } }) =>
+      setDraft((d) => ({ ...d, [key]: e.target.value }))
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="plan-details-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.98 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3">
+          <div>
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Plan details
+            </p>
+            <h2
+              id="plan-details-title"
+              className="m-0 mt-0.5 font-medium text-[#0F3D2E]"
+              style={{ ...displayFont, fontSize: '1.1rem' }}
             >
               {app.first_name} {app.last_name}
             </h2>
@@ -1445,90 +2111,490 @@ function DirectoryHistoryModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[10px] border-0 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] font-semibold text-[#55655D] transition hover:bg-[#0F3D2E]/[0.06] hover:text-[#0F3D2E]"
+            className="rounded-[8px] border-0 bg-transparent px-2 py-1 font-sans text-[0.8125rem] font-semibold text-[#55655D] hover:bg-[#0F3D2E]/[0.06]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {(
+              [
+                ['plan_name', 'Plan name / type'],
+                ['carrier', 'Carrier'],
+                ['plan_id', 'Plan ID'],
+                ['contract_id', 'Contract ID'],
+                ['pbp', 'PBP'],
+                ['premium', 'Premium'],
+                ['deductible', 'Deductible'],
+                ['coverage_start', 'Coverage start'],
+                ['coverage_end', 'Coverage end'],
+                ['network', 'Network'],
+                ['metal_tier', 'Metal tier'],
+                ['group_number', 'Group number'],
+                ['rx_bin', 'Rx BIN'],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="block">
+                <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  {label}
+                </span>
+                <input
+                  className={field}
+                  type={key.includes('coverage') ? 'date' : 'text'}
+                  value={draft[key]}
+                  onChange={setField(key)}
+                />
+              </label>
+            ))}
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                Plan notes
+              </span>
+              <textarea
+                className={`${field} min-h-[72px] resize-y`}
+                value={draft.notes}
+                onChange={setField('notes')}
+              />
+            </label>
+          </div>
+        </div>
+        <div className="flex shrink-0 justify-end border-t border-[#0F3D2E]/10 px-4 py-3">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void save()}
+            className="rounded-[10px] bg-[#0F3D2E] px-4 py-1.5 font-sans text-[0.75rem] font-semibold text-[#E8DFD6] disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save plan details'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function DirectoryNotesModal({
+  app,
+  onClose,
+  onSave,
+}: {
+  app: Application
+  onClose: () => void
+  onSave: (text: string) => Promise<boolean>
+}) {
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const history = getNotesHistory(app.notes)
+  const current = getDirectoryNotes(app.notes)
+
+  const entries = useMemo(() => {
+    const list: { at: string; text: string; current?: boolean }[] = history.map((h) => ({
+      ...h,
+    }))
+    if (current.trim()) {
+      const inHistory = history.some((h) => h.text.trim() === current.trim())
+      if (!inHistory) {
+        list.unshift({ at: '', text: current, current: true })
+      }
+    }
+    return list
+  }, [history, current])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const save = async () => {
+    if (!draft.trim() || saving) return
+    setSaving(true)
+    try {
+      const ok = await onSave(draft.trim())
+      if (ok) {
+        setDraft('')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="directory-notes-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="flex max-h-[min(88vh,560px)] w-full max-w-lg flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 12, scale: 0.98 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Notes
+            </p>
+            <h2
+              id="directory-notes-title"
+              className="m-0 mt-0.5 truncate font-medium text-[#0F3D2E]"
+              style={{ ...displayFont, fontSize: '1.15rem' }}
+            >
+              {app.first_name} {app.last_name}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[8px] border-0 bg-transparent px-2 py-1 font-sans text-[0.8125rem] font-semibold text-[#55655D] hover:bg-[#0F3D2E]/[0.06]"
           >
             Close
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
-          <section>
-            <h3 className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
-              Notes history
-            </h3>
-            {noteEntries.length === 0 ? (
-              <p className="m-0 mt-2 font-sans text-[0.8125rem] text-[#55655D]">No notes recorded yet.</p>
-            ) : (
-              <ul className="m-0 mt-2 list-none space-y-2 p-0">
-                {noteEntries.map((entry, i) => (
-                  <li
-                    key={`${entry.at}-${i}`}
-                    className="rounded-[12px] border border-[#0F3D2E]/08 bg-[#E8DFD6] px-3 py-2.5"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">
-                        {entry.current ? 'Current' : fmtDate(entry.at)}
-                      </p>
-                      {entry.current ? (
-                        <span className="rounded-full bg-[#0F3D2E]/10 px-2 py-0.5 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#0F3D2E]">
-                          Latest
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="m-0 mt-1 whitespace-pre-wrap font-sans text-[0.8125rem] text-[#0F3D2E]">
-                      {entry.text}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {microLedger.length > 0 ? (
-              <div className="mt-3 border-t border-[#0F3D2E]/08 pt-3">
-                <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
-                  Micro ledger
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3 sm:px-5">
+          {entries.length === 0 ? (
+            <p className="m-0 font-sans text-[0.8125rem] text-[#55655D]">No notes yet.</p>
+          ) : (
+            entries.map((entry, i) => (
+              <div
+                key={`${entry.at}-${i}`}
+                className="rounded-[12px] border border-[#0F3D2E]/08 bg-white px-3 py-2.5"
+              >
+                <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  {entry.current ? 'Current' : fmtDate(entry.at)}
                 </p>
-                <ul className="m-0 mt-1.5 max-h-40 list-none space-y-1 overflow-y-auto p-0">
-                  {microLedger.map((e, i) => (
-                    <li
-                      key={`${e.at}-${e.action}-${i}`}
-                      className="font-sans text-[0.625rem] leading-snug text-[#55655D]"
-                    >
-                      <span className="text-[#0F3D2E]/70">{fmtDate(e.at)}</span>
-                      {' · '}
-                      <span className="lowercase">{e.action.replace(/_/g, ' ')}</span>
-                      {e.actor ? ` · ${e.actor}` : ''}
-                      {e.detail ? ` · ${e.detail}` : ''}
-                    </li>
-                  ))}
-                </ul>
+                <p className="m-0 mt-1 whitespace-pre-wrap font-sans text-[0.8125rem] leading-[1.5] text-[#0F3D2E]">
+                  {entry.text}
+                </p>
               </div>
-            ) : null}
-          </section>
-
-          <section>
-            <h3 className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
-              Enrollment history
-            </h3>
-            <ul className="m-0 mt-2 list-none space-y-2 p-0">
-              {enrollmentEvents.map((ev, i) => (
-                <li
-                  key={`${ev.title}-${i}`}
-                  className="rounded-[12px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2.5"
-                >
-                  <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">{fmtDate(ev.at)}</p>
-                  <p className="m-0 mt-0.5 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
-                    {ev.title}
-                  </p>
-                  <p className="m-0 mt-0.5 break-words font-sans text-[0.75rem] text-[#55655D]">
-                    {ev.detail}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
+            ))
+          )}
         </div>
-      </div>
-    </div>
+
+        <div className="shrink-0 border-t border-[#0F3D2E]/10 px-4 py-3 sm:px-5">
+          <label className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+            New note
+          </label>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Write a new note…"
+            className="min-h-[5.5rem] w-full resize-y rounded-[10px] border border-[#0F3D2E]/20 bg-white px-2.5 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E]/45"
+          />
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              disabled={!draft.trim() || saving}
+              onClick={() => void save()}
+              className="rounded-[10px] bg-[#0F3D2E] px-4 py-1.5 font-sans text-[0.75rem] font-semibold text-[#E8DFD6] transition hover:bg-[#0A2E22] disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save note'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function DirectoryHistoryModal({
+  app,
+  onClose,
+}: {
+  app: Application
+  onClose: () => void
+}) {
+  const microLedger = getMicroLedger(app.notes)
+  const agentOfRecord = getAgentOfRecord(app.notes)
+  const [ledgerPage, setLedgerPage] = useState(0)
+  const [threadMessages, setThreadMessages] = useState<
+    {
+      id: string
+      sender_role: string
+      message: string
+      message_type: string
+      created_at: string
+    }[]
+  >([])
+  const [threadTitle, setThreadTitle] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [fullThreadOpen, setFullThreadOpen] = useState(false)
+  const [threadUpdatedAt, setThreadUpdatedAt] = useState<string | null>(null)
+
+  const LEDGER_PAGE = 8
+  const ledgerPages = Math.max(1, Math.ceil(microLedger.length / LEDGER_PAGE))
+  const ledgerSlice = microLedger.slice(
+    ledgerPage * LEDGER_PAGE,
+    ledgerPage * LEDGER_PAGE + LEDGER_PAGE,
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const res = await fetch('/api/admin/conversations?limit=40')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.ok || cancelled) return
+      const match = (data.conversations || []).find(
+        (c: { application_id?: string | null }) => c.application_id === app.id,
+      )
+      if (!match) {
+        const created = await fetch('/api/admin/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationId: app.id, createdAt: app.created_at }),
+        })
+        const createdData = await created.json().catch(() => ({}))
+        if (created.ok && createdData?.conversation?.id) {
+          const detail = await fetch(`/api/admin/conversations/${createdData.conversation.id}`)
+          const detailData = await detail.json().catch(() => ({}))
+          if (!cancelled && detail.ok && detailData?.ok) {
+            setConversationId(createdData.conversation.id)
+            setThreadTitle(createdData.conversation.title)
+            setThreadUpdatedAt(createdData.conversation.updated_at || null)
+            setThreadMessages(detailData.messages || [])
+          }
+        }
+        return
+      }
+      setConversationId(match.id)
+      setThreadTitle(match.title)
+      setThreadUpdatedAt(match.updated_at || null)
+      const detail = await fetch(`/api/admin/conversations/${match.id}`)
+      const detailData = await detail.json().catch(() => ({}))
+      if (!cancelled && detail.ok && detailData?.ok) {
+        setThreadMessages(detailData.messages || [])
+      } else if (!cancelled) {
+        setThreadMessages(match.messages || [])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [app.id, app.created_at])
+
+  useEffect(() => {
+    setLedgerPage(0)
+  }, [app.id, microLedger.length])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !fullThreadOpen) onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, fullThreadOpen])
+
+  const previewMessages = threadMessages.slice(-5)
+
+  return (
+    <>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="directory-history-title"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        onClick={onClose}
+      >
+        <motion.div
+          className="flex max-h-[min(88vh,640px)] w-full max-w-2xl flex-col overflow-hidden rounded-[16px] bg-[#F7F3EE] shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 12, scale: 0.98 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#0F3D2E]/10 px-4 py-3 sm:px-5">
+            <div className="min-w-0">
+              <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+                Client history
+              </p>
+              <h2
+                id="directory-history-title"
+                className="m-0 mt-0.5 font-medium text-[#0F3D2E]"
+                style={{ ...displayFont, fontSize: '1.2rem' }}
+              >
+                {app.first_name} {app.last_name}
+              </h2>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {threadTitle ? (
+                  <p className="m-0 font-sans text-[0.75rem] font-semibold text-[#0F3D2E]">
+                    {threadTitle}
+                  </p>
+                ) : null}
+                {agentOfRecord ? (
+                  <span
+                    className="inline-flex max-w-full items-center truncate rounded-full bg-[#0F3D2E]/10 px-2 py-0.5 font-sans text-[0.5625rem] font-semibold tracking-[0.04em] text-[#0F3D2E]"
+                    title={agentOfRecord}
+                  >
+                    Agent of Record: {formatAgentDisplay(agentOfRecord) || agentOfRecord}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[10px] border-0 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] font-semibold text-[#55655D] transition hover:bg-[#0F3D2E]/[0.06] hover:text-[#0F3D2E]"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+            <section>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
+                  Application Conversations
+                </h3>
+                {conversationId ? (
+                  <button
+                    type="button"
+                    onClick={() => setFullThreadOpen(true)}
+                    className="rounded-[8px] border-0 bg-transparent px-2 py-0.5 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06]"
+                  >
+                    Open
+                  </button>
+                ) : null}
+              </div>
+              {threadTitle ? (
+                <p
+                  className="m-0 mt-2 font-medium text-[#0F3D2E]"
+                  style={{ ...displayFont, fontSize: '1.05rem' }}
+                >
+                  {threadTitle}
+                </p>
+              ) : null}
+              <p className="m-0 mt-0.5 font-sans text-[0.6875rem] text-[#55655D]">
+                {app.first_name} {app.last_name} · {app.application_status.replace(/_/g, ' ')}
+              </p>
+              {threadUpdatedAt ? (
+                <p className="m-0 mt-0.5 font-sans text-[0.625rem] text-[#55655D]">
+                  {fmtDate(threadUpdatedAt)}
+                </p>
+              ) : null}
+
+              {previewMessages.length === 0 ? (
+                <p className="m-0 mt-3 font-sans text-[0.8125rem] text-[#55655D]">
+                  No conversation messages yet.
+                </p>
+              ) : (
+                <ul className="m-0 mt-3 list-none space-y-2.5 p-0">
+                  {previewMessages.map((m) => {
+                    const isSystem =
+                      m.message_type === 'system' ||
+                      m.message_type === 'status' ||
+                      m.sender_role === 'system'
+                    const label =
+                      m.message_type === 'note'
+                        ? 'Note'
+                        : isSystem
+                          ? 'System'
+                          : m.sender_role === 'admin'
+                            ? 'Admin'
+                            : m.sender_role === 'producer'
+                              ? 'Producer'
+                              : 'Office'
+                    return (
+                      <li key={m.id} className="min-w-0">
+                        <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#0F3D2E]">
+                          {label}
+                        </p>
+                        <p className="m-0 mt-0.5 whitespace-pre-wrap font-sans text-[0.8125rem] leading-snug text-[#55655D]">
+                          {m.message || '—'}
+                        </p>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#0F3D2E]">
+                  Micro ledger
+                </h3>
+                {microLedger.length > 0 ? (
+                  <p className="m-0 font-sans text-[0.625rem] font-semibold text-[#0F3D2E]">
+                    {ledgerPage + 1} / {ledgerPages}
+                  </p>
+                ) : null}
+              </div>
+              {microLedger.length === 0 ? (
+                <p className="m-0 mt-2 font-sans text-[0.8125rem] text-[#55655D]">
+                  No ledger activity yet.
+                </p>
+              ) : (
+                <>
+                  <ul className="m-0 mt-2 list-none space-y-2 p-0">
+                    {ledgerSlice.map((e, i) => (
+                      <li
+                        key={`${e.at}-${e.action}-${i}`}
+                        className="rounded-[12px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2.5"
+                      >
+                        <p className="m-0 font-sans text-[0.6875rem] text-[#55655D]">
+                          {fmtDate(e.at)}
+                        </p>
+                        <p className="m-0 mt-0.5 font-sans text-[0.8125rem] font-semibold capitalize text-[#0F3D2E]">
+                          {e.action.replace(/_/g, ' ')}
+                        </p>
+                        <p className="m-0 mt-0.5 break-words font-sans text-[0.75rem] text-[#55655D]">
+                          {[e.actor, e.detail].filter(Boolean).join(' · ')}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  {ledgerPages > 1 ? (
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={ledgerPage <= 0}
+                        onClick={() => setLedgerPage((p) => Math.max(0, p - 1))}
+                        className="rounded-[8px] border-0 bg-[#E8DFD6] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        disabled={ledgerPage >= ledgerPages - 1}
+                        onClick={() => setLedgerPage((p) => Math.min(ledgerPages - 1, p + 1))}
+                        className="rounded-[8px] border-0 bg-[#E8DFD6] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </section>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {fullThreadOpen && conversationId ? (
+        <ConversationViewModal
+          conversationId={conversationId}
+          onClose={() => setFullThreadOpen(false)}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -1536,28 +2602,53 @@ function ClientsDirectoryPanel({
   applications,
   actorEmail,
   onSaveNotes,
+  onSaveRecord,
   onAudit,
+  onFlash,
 }: {
   applications: Application[]
   actorEmail: string | null
   onSaveNotes: (id: string, notes: string | null) => Promise<boolean>
+  onSaveRecord: (
+    id: string,
+    patch: Partial<
+      Pick<
+        Application,
+        | 'first_name'
+        | 'last_name'
+        | 'email'
+        | 'phone'
+        | 'date_of_birth'
+        | 'address'
+        | 'city'
+        | 'state'
+        | 'zip'
+        | 'plan_type'
+        | 'notes'
+      >
+    >,
+  ) => Promise<boolean>
   onAudit: (
     id: string,
     action: string,
     detail?: string,
     opts?: { silent?: boolean },
   ) => Promise<boolean>
+  onFlash: (message: string | null) => void
 }) {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [notesDraft, setNotesDraft] = useState('')
-  const [savingNotes, setSavingNotes] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [mailingOpen, setMailingOpen] = useState(false)
+  const [planOpen, setPlanOpen] = useState(false)
+  const [idView, setIdView] = useState<'ssn' | 'mbi'>('ssn')
   const [ssnRevealed, setSsnRevealed] = useState(false)
   const [callTarget, setCallTarget] = useState<SoftPhoneTarget | null>(null)
-  const [microLedgerOpen, setMicroLedgerOpen] = useState(false)
   const [enrollmentOpen, setEnrollmentOpen] = useState(false)
+  const [fieldsLocked, setFieldsLocked] = useState(true)
+  const [fieldDraft, setFieldDraft] = useState<DirectoryFieldDraft | null>(null)
+  const [savingFields, setSavingFields] = useState(false)
   const lastViewedId = useRef<string | null>(null)
 
   const matches = useMemo(() => {
@@ -1578,6 +2669,8 @@ function ClientsDirectoryPanel({
         a.source,
         a.application_status,
         getAgentOfRecord(a.notes),
+        getPolicyId(a.notes),
+        getLeadId(a.notes),
         getDirectoryNotes(a.notes),
       ]
         .filter(Boolean)
@@ -1598,11 +2691,14 @@ function ClientsDirectoryPanel({
   const selected = applications.find((a) => a.id === selectedId) ?? null
 
   useEffect(() => {
-    setNotesDraft(selected ? getDirectoryNotes(selected.notes) : '')
-    setHistoryOpen(false)
+    setNotesOpen(false)
+    setMailingOpen(false)
+    setPlanOpen(false)
     setSsnRevealed(false)
-    setMicroLedgerOpen(false)
     setEnrollmentOpen(false)
+    setFieldsLocked(true)
+    setFieldDraft(null)
+    if (selected) setIdView(getPreferredId(selected.notes))
   }, [selected?.id])
 
   useEffect(() => {
@@ -1612,11 +2708,14 @@ function ClientsDirectoryPanel({
   }, [selectedId, onAudit])
 
   const fullSsn = selected ? getFullSsn(selected.notes) : ''
-  const microLedger = selected ? getMicroLedger(selected.notes) : []
+  const editing = Boolean(selected && !fieldsLocked && fieldDraft)
+
+  const displayEmail = editing ? fieldDraft!.email : selected?.email || ''
+  const displayPhone = editing ? fieldDraft!.phone : selected?.phone || ''
 
   const duplicateEmailWarning = useMemo(() => {
-    if (!selected?.email) return null
-    const email = normalizeEmail(selected.email)
+    if (!selected || !displayEmail) return null
+    const email = normalizeEmail(displayEmail)
     if (!email) return null
     const others = applications.filter(
       (a) => a.id !== selected.id && normalizeEmail(a.email) === email,
@@ -1628,11 +2727,11 @@ function ClientsDirectoryPanel({
       .join(', ')
     const more = others.length > 3 ? ` (+${others.length - 3} more)` : ''
     return `Another profile is using the same email: ${names}${more}`
-  }, [applications, selected])
+  }, [applications, selected, displayEmail])
 
   const duplicatePhoneWarning = useMemo(() => {
-    if (!selected?.phone) return null
-    const phone = normalizePhone(selected.phone)
+    if (!selected || !displayPhone) return null
+    const phone = normalizePhone(displayPhone)
     if (phone.length < 7) return null
     const others = applications.filter(
       (a) => a.id !== selected.id && normalizePhone(a.phone) === phone,
@@ -1644,7 +2743,7 @@ function ClientsDirectoryPanel({
       .join(', ')
     const more = others.length > 3 ? ` (+${others.length - 3} more)` : ''
     return `Another profile is using the same phone number: ${names}${more}`
-  }, [applications, selected])
+  }, [applications, selected, displayPhone])
 
   const fieldDefs = [
     'First name',
@@ -1652,60 +2751,251 @@ function ClientsDirectoryPanel({
     'Email',
     'Phone number',
     'Date of birth',
-    'Plan type',
     'Address',
+    'City',
+    'State',
+    'ZIP',
+    'SSN',
+    'Plan type',
+    'Lead ID',
     'Application ID',
-    'Agent of Record',
+    'Policy ID',
   ] as const
 
-  const fields: { label: string; value: string; warning?: string | null }[] = fieldDefs.map(
-    (label) => {
-      if (!selected) return { label, value: '' }
-      switch (label) {
-        case 'Application ID':
-          return { label, value: selected.id }
-        case 'Agent of Record':
-          return { label, value: getAgentOfRecord(selected.notes) }
-        case 'First name':
-          return { label, value: selected.first_name || '' }
-        case 'Last name':
-          return { label, value: selected.last_name || '' }
-        case 'Email':
-          return { label, value: selected.email || '', warning: duplicateEmailWarning }
-        case 'Phone number':
-          return { label, value: selected.phone || '', warning: duplicatePhoneWarning }
-        case 'Date of birth':
-          return { label, value: selected.date_of_birth || '' }
-        case 'Plan type':
-          return { label, value: selected.plan_type || '' }
-        case 'Address':
-          return {
-            label,
-            value:
-              [selected.address, selected.city, selected.state, selected.zip]
-                .filter(Boolean)
-                .join(', ') || '',
-          }
-        default:
-          return { label, value: '' }
-      }
-    },
-  )
+  const fields: {
+    label: string
+    value: string
+    warning?: string | null
+    editable?: boolean
+    draftKey?: keyof DirectoryFieldDraft
+  }[] = fieldDefs.map((label) => {
+    if (!selected) return { label, value: '', editable: false }
+    const draft = editing ? fieldDraft! : null
+    switch (label) {
+      case 'Application ID':
+        return { label, value: selected.id, editable: false }
+      case 'Lead ID':
+        return {
+          label,
+          value: draft ? draft.lead_id : getLeadId(selected.notes),
+          editable: true,
+          draftKey: 'lead_id',
+        }
+      case 'Policy ID':
+        return {
+          label,
+          value: draft ? draft.policy_id : getPolicyId(selected.notes),
+          editable: true,
+          draftKey: 'policy_id',
+        }
+      case 'First name':
+        return {
+          label,
+          value: draft ? draft.first_name : selected.first_name || '',
+          editable: true,
+          draftKey: 'first_name',
+        }
+      case 'Last name':
+        return {
+          label,
+          value: draft ? draft.last_name : selected.last_name || '',
+          editable: true,
+          draftKey: 'last_name',
+        }
+      case 'Email':
+        return {
+          label,
+          value: draft ? draft.email : selected.email || '',
+          warning: duplicateEmailWarning,
+          editable: true,
+          draftKey: 'email',
+        }
+      case 'Phone number':
+        return {
+          label,
+          value: draft ? draft.phone : selected.phone || '',
+          warning: duplicatePhoneWarning,
+          editable: true,
+          draftKey: 'phone',
+        }
+      case 'Date of birth':
+        return {
+          label,
+          value: draft ? draft.date_of_birth : selected.date_of_birth || '',
+          editable: true,
+          draftKey: 'date_of_birth',
+        }
+      case 'Plan type':
+        return {
+          label,
+          value: draft ? draft.plan_type : selected.plan_type || '',
+          editable: true,
+          draftKey: 'plan_type',
+        }
+      case 'Address':
+        return {
+          label,
+          value: draft ? draft.address : selected.address || '',
+          editable: true,
+          draftKey: 'address',
+        }
+      case 'City':
+        return {
+          label,
+          value: draft ? draft.city : selected.city || '',
+          editable: true,
+          draftKey: 'city',
+        }
+      case 'State':
+        return {
+          label,
+          value: draft ? draft.state : formatStateInput(selected.state || ''),
+          editable: true,
+          draftKey: 'state',
+        }
+      case 'ZIP':
+        return {
+          label,
+          value: draft ? draft.zip : formatZipInput(selected.zip || ''),
+          editable: true,
+          draftKey: 'zip',
+        }
+      case 'SSN':
+        return {
+          label,
+          value: '',
+          editable: true,
+          draftKey: 'ssn',
+        }
+      default:
+        return { label, value: '', editable: false }
+    }
+  })
 
-  const saveNotes = async () => {
-    if (!selected) return
-    setSavingNotes(true)
-    try {
-      let notes = withDirectoryNotes(selected.notes, notesDraft)
-      notes = withMicroLedger(notes, {
-        at: new Date().toISOString(),
-        actor: actorEmail || 'admin',
-        action: 'notes_updated',
-        detail: 'Directory notes saved',
+  const spokenAgent = selected ? getLastSpokenAgent(selected.notes) : ''
+  const spokenAgentLabel = spokenAgent ? formatAgentDisplay(spokenAgent) : '—'
+
+  const saveNotes = async (text: string) => {
+    if (!selected) return false
+    let notes = withDirectoryNotes(selected.notes, text)
+    notes = withMicroLedger(notes, {
+      at: new Date().toISOString(),
+      actor: actorEmail || 'admin',
+      action: 'notes_updated',
+      detail: 'Directory notes saved',
+    })
+    const ok = await onSaveNotes(selected.id, notes)
+    if (ok && text.trim()) {
+      await fetch('/api/admin/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: selected.id,
+          createdAt: selected.created_at,
+          note: text.trim(),
+        }),
       })
-      await onSaveNotes(selected.id, notes)
+    }
+    return ok
+  }
+
+  const saveFieldDraft = async () => {
+    if (!selected || !fieldDraft) return false
+    const baseline = directoryDraftFromApp(selected)
+    const email = fieldDraft.email.trim()
+    const state = formatStateInput(fieldDraft.state)
+    const zip = formatZipInput(fieldDraft.zip)
+
+    if (!email) {
+      onFlash('Email is required.')
+      return false
+    }
+    if (!isValidDirectoryEmail(email)) {
+      onFlash('Enter a valid email with an @ and a domain extension (e.g. name@example.com).')
+      return false
+    }
+    if (state && !isValidState(state)) {
+      onFlash('Enter a valid 2-letter US state code.')
+      return false
+    }
+    if (zip && !isValidZip(zip)) {
+      onFlash('ZIP must be 5 digits, or ZIP+4 (12345-6789).')
+      return false
+    }
+
+    const changed =
+      baseline.first_name !== fieldDraft.first_name.trim() ||
+      baseline.last_name !== fieldDraft.last_name.trim() ||
+      baseline.email !== email ||
+      baseline.phone.replace(/\D/g, '') !== fieldDraft.phone.replace(/\D/g, '') ||
+      baseline.date_of_birth !== fieldDraft.date_of_birth.trim() ||
+      baseline.plan_type !== fieldDraft.plan_type.trim() ||
+      baseline.address !== fieldDraft.address.trim() ||
+      baseline.city !== fieldDraft.city.trim() ||
+      baseline.state !== state ||
+      baseline.zip !== zip ||
+      baseline.lead_id !== fieldDraft.lead_id.trim() ||
+      baseline.policy_id !== fieldDraft.policy_id.trim() ||
+      baseline.ssn.replace(/\D/g, '') !== fieldDraft.ssn.replace(/\D/g, '') ||
+      baseline.mbi.replace(/[^a-zA-Z0-9]/gi, '').toUpperCase() !==
+        fieldDraft.mbi.replace(/[^a-zA-Z0-9]/gi, '').toUpperCase()
+
+    if (!changed) return true
+
+    let notes = selected.notes
+    if (baseline.policy_id !== fieldDraft.policy_id.trim()) {
+      notes = withPolicyId(notes, fieldDraft.policy_id)
+    }
+    if (baseline.lead_id !== fieldDraft.lead_id.trim()) {
+      notes = withLeadId(notes, fieldDraft.lead_id)
+    }
+    const draftSsnDigits = fieldDraft.ssn.replace(/\D/g, '')
+    const baselineSsnDigits = baseline.ssn.replace(/\D/g, '')
+    if (draftSsnDigits !== baselineSsnDigits && !fieldDraft.ssn.includes('*')) {
+      notes = withFullSsn(notes, fieldDraft.ssn)
+    }
+    if (baseline.mbi.trim().toUpperCase() !== fieldDraft.mbi.trim().toUpperCase()) {
+      notes = withMbi(notes, fieldDraft.mbi)
+    }
+    notes = withPreferredId(notes, idView)
+    notes = withMicroLedger(notes, {
+      at: new Date().toISOString(),
+      actor: actorEmail || 'admin',
+      action: 'profile_updated',
+      detail: 'Directory record fields saved',
+    })
+
+    return onSaveRecord(selected.id, {
+      first_name: fieldDraft.first_name.trim(),
+      last_name: fieldDraft.last_name.trim(),
+      email,
+      phone: formatPhoneInput(fieldDraft.phone) || null,
+      date_of_birth: dobToStorage(fieldDraft.date_of_birth) || null,
+      plan_type: fieldDraft.plan_type.trim() || null,
+      address: fieldDraft.address.trim() || null,
+      city: fieldDraft.city.trim() || null,
+      state: state || null,
+      zip: zip || null,
+      notes,
+    })
+  }
+
+  const toggleFieldsLock = async () => {
+    if (!selected || savingFields) return
+    if (fieldsLocked) {
+      setFieldDraft(directoryDraftFromApp(selected))
+      setFieldsLocked(false)
+      setSsnRevealed(true)
+      return
+    }
+    setSavingFields(true)
+    try {
+      const ok = await saveFieldDraft()
+      if (!ok) return
+      setFieldsLocked(true)
+      setFieldDraft(null)
     } finally {
-      setSavingNotes(false)
+      setSavingFields(false)
     }
   }
 
@@ -1715,21 +3005,71 @@ function ClientsDirectoryPanel({
     void onAudit(selected.id, 'ssn_revealed', 'Directory', { silent: true })
   }
 
+  const toggleSsnReveal = () => {
+    if (!selected || !fullSsn || editing) return
+    if (ssnRevealed) {
+      setSsnRevealed(false)
+      return
+    }
+    revealSsn()
+  }
+
   const clearDirectory = () => {
     setSearch('')
     setSelectedId(null)
-    setNotesDraft('')
     setPickerOpen(false)
-    setHistoryOpen(false)
+    setNotesOpen(false)
+    setMailingOpen(false)
+    setPlanOpen(false)
     setSsnRevealed(false)
-    setMicroLedgerOpen(false)
     setEnrollmentOpen(false)
+    setFieldsLocked(true)
+    setFieldDraft(null)
+  }
+
+  const saveMailingAddress = async (mailing: MailingAddress) => {
+    if (!selected) return false
+    let notes = withMailingAddress(selected.notes, mailing)
+    notes = withMicroLedger(notes, {
+      at: new Date().toISOString(),
+      actor: actorEmail || 'admin',
+      action: 'mailing_address_updated',
+      detail: 'Mailing address saved',
+    })
+    return onSaveNotes(selected.id, notes)
+  }
+
+  const savePlanDetails = async (details: PlanDetails, planType: string) => {
+    if (!selected) return false
+    let notes = withPlanDetails(selected.notes, details)
+    notes = withMicroLedger(notes, {
+      at: new Date().toISOString(),
+      actor: actorEmail || 'admin',
+      action: 'plan_details_updated',
+      detail: 'Plan details saved',
+    })
+    const ok = await onSaveRecord(selected.id, {
+      plan_type: planType.trim() || details.plan_name.trim() || selected.plan_type,
+      notes,
+    })
+    if (ok && fieldDraft) {
+      setFieldDraft((prev) =>
+        prev
+          ? { ...prev, plan_type: planType.trim() || details.plan_name.trim() || prev.plan_type }
+          : prev,
+      )
+    }
+    return ok
   }
 
   const emptyFieldClass =
     'w-full rounded-[10px] border border-[#0F3D2E]/20 bg-transparent px-2.5 py-1.5 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none placeholder:text-[#55655D]/50'
   const filledFieldClass =
     'w-full cursor-default rounded-[10px] border border-[#0F3D2E]/15 bg-[#FAFCFB] px-2.5 py-1.5 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none'
+  const editableFieldClass =
+    'w-full rounded-[10px] border border-[#0F3D2E]/35 bg-white px-2.5 py-1.5 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none ring-0 focus:border-[#0F3D2E]/55'
+  const invalidFieldClass =
+    'w-full rounded-[10px] border border-[#8B3A3A]/55 bg-white px-2.5 py-1.5 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none ring-0 focus:border-[#8B3A3A]'
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-[#F7F3EE] p-3 sm:p-4">
@@ -1745,144 +3085,470 @@ function ClientsDirectoryPanel({
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.32fr)]">
         {/* Client record — larger left column */}
         <section className="flex min-h-0 flex-col overflow-hidden rounded-[14px] bg-[#E8DFD6] p-3 sm:p-4">
-          <div className="mb-3 flex min-h-[1.75rem] shrink-0 flex-wrap items-center gap-2">
-            {selected ? (
-              <>
-                <h3 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
-                  {selected.first_name} {selected.last_name}
+          <div className="mb-3 flex min-h-[1.75rem] shrink-0 items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {selected ? (
+                <>
+                  <h3 className="m-0 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+                    {editing ? `${fieldDraft!.first_name} ${fieldDraft!.last_name}`.trim() : `${selected.first_name} ${selected.last_name}`}
+                  </h3>
+                  {enrollmentBadge(selected.application_status, {
+                    onClick: () => setEnrollmentOpen(true),
+                    title: 'View coverage start, submitted date, and enrollment history',
+                  })}
+                </>
+              ) : (
+                <h3 className="m-0 font-medium text-[#55655D]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+                  Client record
                 </h3>
-                {enrollmentBadge(selected.application_status, {
-                  onClick: () => setEnrollmentOpen(true),
-                  title: 'View coverage start, submitted date, and enrollment history',
-                })}
-              </>
-            ) : (
-              <h3 className="m-0 font-medium text-[#55655D]" style={{ ...displayFont, fontSize: '1.15rem' }}>
-                Client record
-              </h3>
-            )}
+              )}
+            </div>
+            {selected ? (
+              <button
+                type="button"
+                disabled={savingFields}
+                onClick={() => void toggleFieldsLock()}
+                title={fieldsLocked ? 'Unlock to edit fields' : 'Lock to save and make read-only'}
+                aria-label={fieldsLocked ? 'Unlock fields' : 'Lock fields'}
+                className="ml-auto inline-flex shrink-0 items-center justify-center rounded-[8px] border-0 bg-transparent p-1.5 text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.08] disabled:opacity-50"
+              >
+                {fieldsLocked ? (
+                  <Lock className="h-4 w-4" strokeWidth={2.25} />
+                ) : (
+                  <LockOpen className="h-4 w-4" strokeWidth={2.25} />
+                )}
+              </button>
+            ) : null}
           </div>
-          <div className="grid min-h-0 shrink grid-cols-1 content-start gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid shrink-0 grid-cols-1 content-start gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {fields.map((f) => {
               const planCategory =
                 f.label === 'Plan type' && selected ? planTypeCategory(selected) : null
+              const canEdit = Boolean(editing && f.editable && f.draftKey)
+              const mbiValue = editing
+                ? fieldDraft!.mbi
+                : selected
+                  ? formatMbiInput(getMbi(selected.notes))
+                  : ''
+              const ssnValue = editing
+                ? fieldDraft!.ssn
+                : selected
+                  ? fullSsn || '—'
+                  : ''
+              const dobDisplay = editing
+                ? fieldDraft!.date_of_birth
+                : selected?.date_of_birth
+                  ? formatDobDisplay(selected.date_of_birth)
+                  : ''
+              const phoneDisplay = editing
+                ? fieldDraft!.phone
+                : selected?.phone
+                  ? formatPhoneInput(selected.phone)
+                  : ''
+
+              if (f.label === 'SSN') {
+                return (
+                  <div key={f.label} className="block">
+                    <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                      <div className="inline-flex rounded-full bg-[#0F3D2E]/10 p-0.5">
+                        <button
+                          type="button"
+                          disabled={!selected}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setIdView('ssn')
+                          }}
+                          className={`rounded-full border-0 px-2 py-0.5 font-sans text-[0.5rem] font-semibold transition ${
+                            idView === 'ssn'
+                              ? 'bg-[#0F3D2E] text-[#E8DFD6]'
+                              : 'bg-transparent text-[#0F3D2E]'
+                          }`}
+                        >
+                          SSN
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!selected}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setIdView('mbi')
+                          }}
+                          className={`rounded-full border-0 px-2 py-0.5 font-sans text-[0.5rem] font-semibold transition ${
+                            idView === 'mbi'
+                              ? 'bg-[#0F3D2E] text-[#E8DFD6]'
+                              : 'bg-transparent text-[#0F3D2E]'
+                          }`}
+                        >
+                          MBI
+                        </button>
+                      </div>
+                      {idView === 'ssn' ? (
+                        <button
+                          type="button"
+                          disabled={!selected || !fullSsn || editing}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            toggleSsnReveal()
+                          }}
+                          title={
+                            !fullSsn
+                              ? 'No SSN on file'
+                              : ssnRevealed || editing
+                                ? 'Hide SSN'
+                                : 'Reveal SSN'
+                          }
+                          aria-label={
+                            ssnRevealed || editing ? 'Hide social security number' : 'Reveal social security number'
+                          }
+                          className="inline-flex items-center justify-center border-0 bg-transparent p-0.5 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-35"
+                        >
+                          {ssnRevealed || editing ? (
+                            <EyeOff className="h-3.5 w-3.5" strokeWidth={2.25} />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" strokeWidth={2.25} />
+                          )}
+                        </button>
+                      ) : null}
+                    </div>
+                    <input
+                      readOnly={!editing}
+                      value={
+                        idView === 'mbi'
+                          ? mbiValue || (editing ? '' : '—')
+                          : ssnValue
+                      }
+                      maxLength={idView === 'mbi' ? 13 : 11}
+                      onChange={
+                        editing
+                          ? (e) =>
+                              setFieldDraft((prev) =>
+                                prev
+                                  ? idView === 'mbi'
+                                    ? { ...prev, mbi: formatMbiInput(e.target.value) }
+                                    : { ...prev, ssn: formatSsnInput(e.target.value) }
+                                  : prev,
+                              )
+                          : undefined
+                      }
+                      className={`${
+                        !selected
+                          ? emptyFieldClass
+                          : editing
+                            ? editableFieldClass
+                            : filledFieldClass
+                      } ${
+                        selected &&
+                        idView === 'ssn' &&
+                        fullSsn &&
+                        !ssnRevealed &&
+                        !editing
+                          ? 'select-none blur-[5px]'
+                          : ''
+                      }`}
+                    />
+                  </div>
+                )
+              }
+
+              if (f.label === 'Date of birth') {
+                return (
+                  <label key={f.label} className="block">
+                    <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                      Date of birth
+                    </span>
+                    <input
+                      readOnly={!canEdit}
+                      value={dobDisplay || (!selected ? '' : editing ? '' : '—')}
+                      inputMode="numeric"
+                      maxLength={10}
+                      onChange={
+                        canEdit
+                          ? (e) =>
+                              setFieldDraft((prev) =>
+                                prev
+                                  ? { ...prev, date_of_birth: formatDobInput(e.target.value) }
+                                  : prev,
+                              )
+                          : undefined
+                      }
+                      className={
+                        !selected
+                          ? emptyFieldClass
+                          : canEdit
+                            ? editableFieldClass
+                            : filledFieldClass
+                      }
+                    />
+                  </label>
+                )
+              }
+
+              if (f.label === 'Phone number') {
+                return (
+                  <label key={f.label} className="block">
+                    <span className="mb-1 flex items-center gap-1 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                      Phone number
+                      <button
+                        type="button"
+                        disabled={!selected?.phone && !displayPhone}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          const phone = displayPhone || selected?.phone
+                          if (!selected || !phone) return
+                          setCallTarget({
+                            applicationId: selected.id,
+                            name: `${selected.first_name} ${selected.last_name}`.trim(),
+                            phone,
+                            context: 'Clients',
+                          })
+                        }}
+                        title={
+                          displayPhone || selected?.phone
+                            ? `Call ${displayPhone || selected?.phone}`
+                            : 'No phone on file'
+                        }
+                        className="inline-flex items-center justify-center border-0 bg-transparent p-0 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-35"
+                      >
+                        <Phone className="h-3 w-3" strokeWidth={2.25} />
+                      </button>
+                      {f.warning ? <DuplicateFieldMark message={f.warning} /> : null}
+                    </span>
+                    <input
+                      readOnly={!canEdit}
+                      value={phoneDisplay || (!selected ? '' : editing ? '' : '—')}
+                      inputMode="tel"
+                      maxLength={14}
+                      onChange={
+                        canEdit
+                          ? (e) =>
+                              setFieldDraft((prev) =>
+                                prev ? { ...prev, phone: formatPhoneInput(e.target.value) } : prev,
+                              )
+                          : undefined
+                      }
+                      className={
+                        !selected
+                          ? emptyFieldClass
+                          : canEdit
+                            ? editableFieldClass
+                            : filledFieldClass
+                      }
+                    />
+                  </label>
+                )
+              }
+
+              if (f.label === 'Email') {
+                const emailInvalid =
+                  canEdit &&
+                  Boolean(fieldDraft?.email.trim()) &&
+                  !isValidDirectoryEmail(fieldDraft!.email)
+                return (
+                  <label key={f.label} className="block">
+                    <span className="mb-1 flex items-center gap-1 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                      {f.label}
+                      {f.warning ? <DuplicateFieldMark message={f.warning} /> : null}
+                    </span>
+                    <input
+                      readOnly={!canEdit}
+                      type="email"
+                      autoComplete="email"
+                      value={f.value}
+                      placeholder="—"
+                      onChange={
+                        canEdit
+                          ? (e) =>
+                              setFieldDraft((prev) =>
+                                prev ? { ...prev, email: e.target.value } : prev,
+                              )
+                          : undefined
+                      }
+                      className={
+                        !selected
+                          ? emptyFieldClass
+                          : canEdit
+                            ? emailInvalid
+                              ? invalidFieldClass
+                              : editableFieldClass
+                            : filledFieldClass
+                      }
+                    />
+                  </label>
+                )
+              }
+
+              if (f.label === 'State') {
+                const stateInvalid =
+                  canEdit &&
+                  Boolean(fieldDraft?.state.trim()) &&
+                  !isValidState(fieldDraft!.state)
+                return (
+                  <label key={f.label} className="block">
+                    <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                      State
+                    </span>
+                    <input
+                      readOnly={!canEdit}
+                      value={f.value}
+                      placeholder="—"
+                      maxLength={2}
+                      autoComplete="address-level1"
+                      onChange={
+                        canEdit
+                          ? (e) =>
+                              setFieldDraft((prev) =>
+                                prev ? { ...prev, state: formatStateInput(e.target.value) } : prev,
+                              )
+                          : undefined
+                      }
+                      className={
+                        !selected
+                          ? emptyFieldClass
+                          : canEdit
+                            ? stateInvalid
+                              ? invalidFieldClass
+                              : editableFieldClass
+                            : filledFieldClass
+                      }
+                    />
+                  </label>
+                )
+              }
+
+              if (f.label === 'ZIP') {
+                const zipInvalid =
+                  canEdit &&
+                  Boolean(fieldDraft?.zip.trim()) &&
+                  !isValidZip(fieldDraft!.zip)
+                return (
+                  <label key={f.label} className="block">
+                    <span className="mb-1 block font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                      ZIP
+                    </span>
+                    <input
+                      readOnly={!canEdit}
+                      value={f.value}
+                      placeholder="—"
+                      inputMode="numeric"
+                      maxLength={10}
+                      autoComplete="postal-code"
+                      onChange={
+                        canEdit
+                          ? (e) =>
+                              setFieldDraft((prev) =>
+                                prev ? { ...prev, zip: formatZipInput(e.target.value) } : prev,
+                              )
+                          : undefined
+                      }
+                      className={
+                        !selected
+                          ? emptyFieldClass
+                          : canEdit
+                            ? zipInvalid
+                              ? invalidFieldClass
+                              : editableFieldClass
+                            : filledFieldClass
+                      }
+                    />
+                  </label>
+                )
+              }
+
               return (
               <label key={f.label} className="block">
                 <span className="mb-1 flex items-center gap-1 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
-                  {f.label === 'Plan type' ? (
-                    <HorseIcon className="h-3 w-3 shrink-0 text-[#0F3D2E]" />
-                  ) : null}
                   {f.label}
                   {planCategory ? (
                     <span className="ml-0.5 inline-flex rounded-full bg-[#0F3D2E]/10 px-1.5 py-0.5 font-sans text-[0.5rem] font-semibold tracking-[0.04em] text-[#0F3D2E]">
                       {planCategory}
                     </span>
                   ) : null}
-                  {f.label === 'Phone number' ? (
+                  {f.label === 'Address' ? (
                     <button
                       type="button"
-                      disabled={!selected?.phone}
+                      disabled={!selected}
                       onClick={(e) => {
                         e.preventDefault()
-                        if (!selected?.phone) return
-                        setCallTarget({
-                          applicationId: selected.id,
-                          name: `${selected.first_name} ${selected.last_name}`.trim(),
-                          phone: selected.phone,
-                          context: 'Clients',
-                        })
+                        setMailingOpen(true)
                       }}
-                      title={selected?.phone ? `Call ${selected.phone}` : 'No phone on file'}
+                      title="Edit mailing address"
+                      aria-label="Edit mailing address"
                       className="inline-flex items-center justify-center border-0 bg-transparent p-0 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-35"
                     >
-                      <Phone className="h-3 w-3" strokeWidth={2.25} />
+                      <Mail className="h-3 w-3" strokeWidth={2.25} />
+                    </button>
+                  ) : null}
+                  {f.label === 'Plan type' ? (
+                    <button
+                      type="button"
+                      disabled={!selected}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPlanOpen(true)
+                      }}
+                      title="Edit plan details"
+                      aria-label="Edit plan details"
+                      className="inline-flex items-center justify-center border-0 bg-transparent p-0 text-[#0F3D2E] transition hover:text-[#245C45] disabled:opacity-35"
+                    >
+                      <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </button>
                   ) : null}
                   {f.warning ? <DuplicateFieldMark message={f.warning} /> : null}
                 </span>
                 <input
-                  readOnly
+                  readOnly={!canEdit}
                   value={f.value}
                   placeholder="—"
-                  className={selected ? filledFieldClass : emptyFieldClass}
+                  onChange={
+                    canEdit && f.draftKey
+                      ? (e) =>
+                          setFieldDraft((prev) =>
+                            prev ? { ...prev, [f.draftKey!]: e.target.value } : prev,
+                          )
+                      : undefined
+                  }
+                  className={
+                    !selected
+                      ? emptyFieldClass
+                      : canEdit
+                        ? editableFieldClass
+                        : filledFieldClass
+                  }
                 />
               </label>
               )
             })}
-            <div className="block">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
-                  SSN
-                </span>
+          </div>
+          <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {selected ? (
                 <button
                   type="button"
-                  disabled={!selected || !fullSsn || ssnRevealed}
-                  onClick={revealSsn}
-                  className="rounded-[6px] border-0 bg-transparent px-1.5 py-0.5 font-sans text-[0.625rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] disabled:opacity-40"
+                  title={
+                    spokenAgent
+                      ? `Last agent who spoke with the client on a connected call: ${spokenAgent}`
+                      : 'Updates when an agent reaches the client by phone and the client picks up'
+                  }
+                  className="inline-flex max-w-full items-center truncate rounded-full border-0 bg-[#0F3D2E]/10 px-1.5 py-0.5 font-sans text-[0.5rem] font-semibold tracking-[0.04em] text-[#0F3D2E]"
                 >
-                  {ssnRevealed ? 'Revealed' : 'Reveal'}
+                  Agent of Record: {spokenAgentLabel}
                 </button>
-              </div>
-              <input
-                readOnly
-                value={selected ? fullSsn || '—' : ''}
-                placeholder="—"
-                className={`${selected ? filledFieldClass : emptyFieldClass} ${
-                  selected && fullSsn && !ssnRevealed ? 'select-none blur-[5px]' : ''
-                }`}
-              />
+              ) : (
+                <span className="font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
+                  Agent of Record
+                </span>
+              )}
             </div>
-          </div>
-          <div className="mt-3 flex min-h-0 flex-1 flex-col">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="font-sans text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
-                Notes
-              </span>
-              <button
-                type="button"
-                disabled={!selected}
-                onClick={() => setHistoryOpen(true)}
-                className="rounded-[8px] border-0 bg-transparent px-2 py-0.5 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.06] disabled:opacity-40"
-              >
-                History
-              </button>
-            </div>
-            <textarea
-              value={notesDraft}
-              onChange={(e) => setNotesDraft(e.target.value)}
-              placeholder="Add notes about this client…"
+            <button
+              type="button"
               disabled={!selected}
-              className={`${
-                selected ? filledFieldClass : emptyFieldClass
-              } min-h-[72px] flex-1 resize-none disabled:opacity-70`}
-            />
-            {selected && microLedger.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setMicroLedgerOpen(true)}
-                className="mt-2 w-full shrink-0 rounded-[8px] border border-[#0F3D2E]/08 bg-[#F7F3EE]/80 px-2 py-1.5 text-left transition hover:bg-[#F0EBE4]"
-                title="View full micro ledger"
-              >
-                <p className="m-0 font-sans text-[0.5rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
-                  Micro ledger
-                </p>
-              <p className="m-0 mt-0.5 truncate font-sans text-[0.5625rem] leading-snug text-[#55655D]">
-                {formatMicroLedgerLine(microLedger[0], { shortDate: true })}
-              </p>
+              onClick={() => setNotesOpen(true)}
+              title="Notes"
+              aria-label="Open notes"
+              className="inline-flex items-center justify-center rounded-[8px] border-0 bg-transparent p-1.5 text-[#0F3D2E] transition hover:bg-[#0F3D2E]/[0.08] disabled:opacity-40"
+            >
+              <StickyNote className="h-4 w-4" strokeWidth={2} />
             </button>
-          ) : null}
-            <div className="mt-2 flex shrink-0 justify-end">
-              <button
-                type="button"
-                disabled={
-                  !selected || savingNotes || notesDraft === getDirectoryNotes(selected.notes)
-                }
-                onClick={() => void saveNotes()}
-                className="shrink-0 rounded-[10px] bg-[#0F3D2E] px-4 py-1.5 font-sans text-[0.75rem] font-semibold leading-none text-[#E8DFD6] transition hover:bg-[#0A2E22] disabled:opacity-50"
-              >
-                {savingNotes ? 'Saving…' : 'Save notes'}
-              </button>
-            </div>
           </div>
         </section>
 
@@ -1955,29 +3621,46 @@ function ClientsDirectoryPanel({
                   ))
                 )}
               </ul>
-            ) : (
-              <p className="m-0 px-0.5 font-sans text-[0.75rem] text-[#55655D]">
-                Type to find a client. Results stay in this panel so the record stays visible.
-              </p>
-            )}
+            ) : null}
           </div>
         </aside>
       </div>
 
-      {historyOpen && selected ? (
-        <DirectoryHistoryModal app={selected} onClose={() => setHistoryOpen(false)} />
-      ) : null}
+      <AnimatePresence>
+        {notesOpen && selected ? (
+          <DirectoryNotesModal
+            key={`notes-${selected.id}`}
+            app={selected}
+            onClose={() => setNotesOpen(false)}
+            onSave={saveNotes}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mailingOpen && selected ? (
+          <MailingAddressModal
+            key={`mail-${selected.id}`}
+            app={selected}
+            onClose={() => setMailingOpen(false)}
+            onSave={saveMailingAddress}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {planOpen && selected ? (
+          <PlanDetailsModal
+            key={`plan-${selected.id}`}
+            app={selected}
+            onClose={() => setPlanOpen(false)}
+            onSave={savePlanDetails}
+          />
+        ) : null}
+      </AnimatePresence>
 
       {enrollmentOpen && selected ? (
         <EnrollmentHistoryModal app={selected} onClose={() => setEnrollmentOpen(false)} />
-      ) : null}
-
-      {microLedgerOpen && selected ? (
-        <MicroLedgerModal
-          entries={microLedger}
-          title={`${selected.first_name} ${selected.last_name}`}
-          onClose={() => setMicroLedgerOpen(false)}
-        />
       ) : null}
 
       <AnimatePresence>
@@ -2479,7 +4162,9 @@ function LeadsSpreadsheetPanel({
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [callTarget, setCallTarget] = useState<SoftPhoneTarget | null>(null)
+  const [page, setPage] = useState(0)
   const lastViewedId = useRef<string | null>(null)
+  const LEADS_PAGE = 25
 
   const leads = useMemo(() => {
     const base = applications.filter((a) => !ENROLLED_STATUSES.has(a.application_status))
@@ -2504,6 +4189,13 @@ function LeadsSpreadsheetPanel({
       return hay.includes(q)
     })
   }, [applications, query])
+
+  const leadPages = Math.max(1, Math.ceil(leads.length / LEADS_PAGE))
+  const pagedLeads = leads.slice(page * LEADS_PAGE, page * LEADS_PAGE + LEADS_PAGE)
+
+  useEffect(() => {
+    setPage(0)
+  }, [query, applications])
 
   const selected = leads.find((a) => a.id === selectedId) ?? null
 
@@ -2597,7 +4289,7 @@ function LeadsSpreadsheetPanel({
                 </tr>
               </thead>
               <tbody>
-                {leads.length === 0 ? (
+                {pagedLeads.length === 0 ? (
                   <tr>
                     <td
                       colSpan={LEAD_COLUMNS.length + 1}
@@ -2607,8 +4299,9 @@ function LeadsSpreadsheetPanel({
                     </td>
                   </tr>
                 ) : (
-                  leads.map((a, i) => {
+                  pagedLeads.map((a, i) => {
                     const isSelected = selectedId === a.id
+                    const rowNum = page * LEADS_PAGE + i + 1
                     return (
                       <tr
                         key={a.id}
@@ -2622,7 +4315,7 @@ function LeadsSpreadsheetPanel({
                         }`}
                       >
                         <td className="sticky left-0 z-[1] border border-[#A8B5AE] bg-inherit px-1 py-1 text-center font-semibold text-[#55655D]">
-                          {i + 1}
+                          {rowNum}
                         </td>
                         {LEAD_COLUMNS.map((col) => (
                           <td
@@ -2641,8 +4334,27 @@ function LeadsSpreadsheetPanel({
             </table>
           </div>
           <div className="flex shrink-0 items-center justify-between border-t border-[#A8B5AE] bg-[#E8EFEA] px-2 py-1 font-sans text-[0.625rem] text-[#55655D]">
-            <span>Ready</span>
-            <span>Select a row to open profile</span>
+            <span>
+              Page {page + 1} / {leadPages}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={page <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="rounded-[4px] border border-[#A8B5AE] bg-white px-2 py-0.5 font-semibold text-[#0F3D2E] disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                disabled={page >= leadPages - 1}
+                onClick={() => setPage((p) => Math.min(leadPages - 1, p + 1))}
+                className="rounded-[4px] border border-[#A8B5AE] bg-white px-2 py-0.5 font-semibold text-[#0F3D2E] disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -2703,11 +4415,34 @@ function OfficeCalendar({
   applications: Application[]
   careers: Career[]
 }) {
+  type CalEvent = {
+    id: string
+    title: string
+    description: string | null
+    starts_at: string
+    ends_at: string | null
+    scope: 'individual' | 'executive' | 'team' | 'company'
+    assignee_email: string | null
+    sync_to_office: boolean
+  }
+
   const [cursor, setCursor] = useState(() => {
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
   })
   const [selectedDay, setSelectedDay] = useState<number | null>(() => new Date().getDate())
+  const [events, setEvents] = useState<CalEvent[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState({
+    title: '',
+    description: '',
+    date: '',
+    time: '09:00',
+    scope: 'company' as CalEvent['scope'],
+    assigneeEmail: '',
+    syncToOffice: true,
+  })
 
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
@@ -2730,22 +4465,68 @@ function OfficeCalendar({
     'December',
   ]
 
+  const loadEvents = useCallback(async () => {
+    const from = new Date(year, month, 1).toISOString()
+    const to = new Date(year, month + 1, 0, 23, 59, 59).toISOString()
+    const res = await fetch(
+      `/api/admin/calendar-events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    )
+    const data = await res.json().catch(() => ({}))
+    if (res.ok && data?.ok) setEvents(data.events || [])
+  }, [year, month])
+
+  useEffect(() => {
+    void loadEvents()
+  }, [loadEvents])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('office-calendar-events')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'office_calendar_events' },
+        () => {
+          void loadEvents()
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [loadEvents])
+
+  type DayBuckets = {
+    individual: number
+    executive: number
+    team: number
+    company: number
+  }
+
   const eventsByDay = useMemo(() => {
-    const map = new Map<number, { apps: number; careers: number }>()
-    const bump = (iso: string, kind: 'apps' | 'careers') => {
-      const d = new Date(iso)
-      if (d.getFullYear() !== year || d.getMonth() !== month) return
-      const day = d.getDate()
-      const cur = map.get(day) ?? { apps: 0, careers: 0 }
-      cur[kind] += 1
+    const map = new Map<number, DayBuckets>()
+    const bump = (day: number, key: keyof DayBuckets) => {
+      const cur = map.get(day) ?? { individual: 0, executive: 0, team: 0, company: 0 }
+      cur[key] += 1
       map.set(day, cur)
     }
-    for (const a of applications) bump(a.created_at, 'apps')
-    for (const c of careers) bump(c.created_at, 'careers')
+    for (const a of applications) {
+      const d = new Date(a.created_at)
+      if (d.getFullYear() === year && d.getMonth() === month) bump(d.getDate(), 'individual')
+    }
+    for (const c of careers) {
+      const d = new Date(c.created_at)
+      if (d.getFullYear() === year && d.getMonth() === month) bump(d.getDate(), 'executive')
+    }
+    for (const e of events) {
+      const d = new Date(e.starts_at)
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        bump(d.getDate(), e.scope)
+      }
+    }
     return map
-  }, [applications, careers, year, month])
+  }, [applications, careers, events, year, month])
 
-  const selectedEvents = selectedDay != null ? eventsByDay.get(selectedDay) : null
   const selectedLabel =
     selectedDay != null
       ? new Date(year, month, selectedDay).toLocaleDateString('en-US', {
@@ -2756,20 +4537,110 @@ function OfficeCalendar({
         })
       : null
 
+  const dayEvents = useMemo(() => {
+    if (selectedDay == null) return []
+    return events
+      .filter((e) => {
+        const d = new Date(e.starts_at)
+        return d.getFullYear() === year && d.getMonth() === month && d.getDate() === selectedDay
+      })
+      .sort((a, b) => +new Date(a.starts_at) - +new Date(b.starts_at))
+  }, [events, selectedDay, year, month])
+
+  const upcomingCount = useMemo(() => {
+    const now = Date.now()
+    return events.filter((e) => new Date(e.starts_at).getTime() >= now).length
+  }, [events])
+
+  const selectedBuckets =
+    selectedDay != null
+      ? eventsByDay.get(selectedDay) ?? { individual: 0, executive: 0, team: 0, company: 0 }
+      : { individual: 0, executive: 0, team: 0, company: 0 }
+
   const cells: (number | null)[] = []
   for (let i = 0; i < firstWeekday; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
 
+  const openCreate = () => {
+    const day = selectedDay ?? today.getDate()
+    const yyyy = year
+    const mm = String(month + 1).padStart(2, '0')
+    const dd = String(day).padStart(2, '0')
+    setDraft({
+      title: '',
+      description: '',
+      date: `${yyyy}-${mm}-${dd}`,
+      time: '09:00',
+      scope: 'company',
+      assigneeEmail: '',
+      syncToOffice: true,
+    })
+    setCreateOpen(true)
+  }
+
+  const saveEvent = async () => {
+    if (!draft.title.trim() || !draft.date || saving) return
+    setSaving(true)
+    try {
+      const startsAt = new Date(`${draft.date}T${draft.time || '09:00'}:00`)
+      const res = await fetch('/api/admin/calendar-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: draft.title.trim(),
+          description: draft.description.trim() || null,
+          startsAt: startsAt.toISOString(),
+          scope: draft.scope,
+          assigneeEmail: draft.scope === 'individual' ? draft.assigneeEmail.trim() : null,
+          syncToOffice: draft.syncToOffice,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.ok) {
+        setCreateOpen(false)
+        await loadEvents()
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F7F3EE]">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#0F3D2E]/10 bg-[#F7F3EE] px-3 py-2.5 sm:px-4">
-        <div>
-          <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-            Calendar
-          </p>
-          <h2 className="m-0 mt-0.5 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
-            {monthNames[month]} {year}
-          </h2>
+        <div className="flex items-center gap-2">
+          <div>
+            <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+              Calendar
+            </p>
+            <h2 className="m-0 mt-0.5 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+              {monthNames[month]} {year}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={openCreate}
+            title="Add calendar event"
+            className="mt-3 inline-flex h-8 w-8 items-center justify-center rounded-[8px] border-0 bg-[#0F3D2E] text-[#E8DFD6] transition hover:bg-[#0A2E22]"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+          </button>
+        </div>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => setCursor(new Date(year, month - 1, 1))}
+            className="rounded-[8px] border-0 bg-[#E8DFD6] px-2.5 py-1 font-sans text-[0.75rem] font-semibold text-[#0F3D2E]"
+          >
+            Prev
+          </button>
+          <button
+            type="button"
+            onClick={() => setCursor(new Date(year, month + 1, 1))}
+            className="rounded-[8px] border-0 bg-[#E8DFD6] px-2.5 py-1 font-sans text-[0.75rem] font-semibold text-[#0F3D2E]"
+          >
+            Next
+          </button>
         </div>
       </div>
 
@@ -2796,6 +4667,9 @@ function OfficeCalendar({
                 today.getMonth() === month &&
                 today.getDate() === day
               const isSelected = selectedDay === day
+              const hasDots =
+                ev &&
+                (ev.individual > 0 || ev.executive > 0 || ev.team > 0 || ev.company > 0)
               return (
                 <button
                   key={day}
@@ -2810,17 +4684,19 @@ function OfficeCalendar({
                   }`}
                 >
                   <span>{day}</span>
-                  {ev && (ev.apps > 0 || ev.careers > 0) ? (
-                    <span className="mt-auto mb-1 flex gap-0.5">
-                      {ev.apps > 0 ? (
-                        <span
-                          className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#C9A961]' : 'bg-[#0F3D2E]'}`}
-                        />
+                  {hasDots ? (
+                    <span className="mt-auto mb-1 flex flex-wrap justify-center gap-0.5 px-0.5">
+                      {ev!.individual > 0 ? (
+                        <span className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#C9A961]' : 'bg-[#0F3D2E]'}`} />
                       ) : null}
-                      {ev.careers > 0 ? (
-                        <span
-                          className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#E8DFD6]' : 'bg-[#C9A961]'}`}
-                        />
+                      {ev!.executive > 0 ? (
+                        <span className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#E8DFD6]' : 'bg-[#C9A961]'}`} />
+                      ) : null}
+                      {ev!.team > 0 ? (
+                        <span className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#7EB8A0]' : 'bg-[#2F6F5E]'}`} />
+                      ) : null}
+                      {ev!.company > 0 ? (
+                        <span className={`h-1 w-1 rounded-full ${isSelected ? 'bg-[#F0E6D8]' : 'bg-[#8B6914]'}`} />
                       ) : null}
                     </span>
                   ) : null}
@@ -2832,7 +4708,7 @@ function OfficeCalendar({
 
         <aside className="flex min-h-0 flex-col border-t border-[#0F3D2E]/10 bg-[#F7F3EE] p-3 lg:border-l lg:border-t-0">
           <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-            Day detail
+            Inbox
           </p>
           <p className="m-0 mt-1 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
             {selectedLabel ?? 'Select a day'}
@@ -2840,31 +4716,166 @@ function OfficeCalendar({
           <div className="mt-3 space-y-2">
             <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2">
               <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
-                Client applications
+                Upcoming events
               </p>
               <p className="m-0 mt-0.5 font-sans text-[1.35rem] font-semibold leading-none text-[#0F3D2E]">
-                {selectedEvents?.apps ?? 0}
+                {upcomingCount}
+              </p>
+              <p className="m-0 mt-1 font-sans text-[0.625rem] text-[#55655D]">
+                Scheduled on calendar · updates live
               </p>
             </div>
             <div className="rounded-[10px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-2">
               <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
-                Career applications
+                This day
               </p>
-              <p className="m-0 mt-0.5 font-sans text-[1.35rem] font-semibold leading-none text-[#0F3D2E]">
-                {selectedEvents?.careers ?? 0}
+              <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#0F3D2E]">
+                Individual {selectedBuckets.individual} · Executive {selectedBuckets.executive} · Team{' '}
+                {selectedBuckets.team} · Company {selectedBuckets.company}
               </p>
             </div>
           </div>
-          <div className="mt-auto flex flex-wrap gap-3 pt-3 font-sans text-[0.625rem] text-[#55655D]">
+
+          <div className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+            {dayEvents.length === 0 ? (
+              <p className="m-0 font-sans text-[0.75rem] text-[#55655D]">No scheduled events this day.</p>
+            ) : (
+              dayEvents.map((e) => (
+                <div key={e.id} className="rounded-[10px] border border-[#0F3D2E]/08 bg-white px-2.5 py-2">
+                  <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#C9A961]">
+                    {e.scope}
+                  </p>
+                  <p className="m-0 mt-0.5 font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">{e.title}</p>
+                  <p className="m-0 mt-0.5 font-sans text-[0.625rem] text-[#55655D]">
+                    {new Date(e.starts_at).toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                    {e.assignee_email ? ` · ${e.assignee_email}` : ''}
+                    {e.sync_to_office ? ' · Office sync' : ''}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1.5 pt-3 font-sans text-[0.625rem] text-[#55655D]">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0F3D2E]" /> Clients
+              <span className="h-1.5 w-1.5 rounded-full bg-[#0F3D2E]" /> Individual
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#C9A961]" /> Careers
+              <span className="h-1.5 w-1.5 rounded-full bg-[#C9A961]" /> Executive
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#2F6F5E]" /> Team
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#8B6914]" /> Company
             </span>
           </div>
         </aside>
       </div>
+
+      <AnimatePresence>
+        {createOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-[#0F3D2E]/45 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setCreateOpen(false)}
+          >
+            <motion.div
+              className="w-full max-w-md rounded-[16px] bg-[#F7F3EE] p-4 shadow-[0_24px_60px_rgba(15,61,46,0.28)]"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="m-0 font-sans text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+                New event
+              </p>
+              <h3 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.15rem' }}>
+                Schedule for Office
+              </h3>
+              <div className="mt-3 space-y-2">
+                <input
+                  value={draft.title}
+                  onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                  placeholder="Event title"
+                  className="w-full rounded-[10px] border border-[#0F3D2E]/15 bg-white px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none"
+                />
+                <textarea
+                  value={draft.description}
+                  onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                  placeholder="Description (optional)"
+                  rows={2}
+                  className="w-full resize-none rounded-[10px] border border-[#0F3D2E]/15 bg-white px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={draft.date}
+                    onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
+                    className="rounded-[10px] border border-[#0F3D2E]/15 bg-white px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none"
+                  />
+                  <input
+                    type="time"
+                    value={draft.time}
+                    onChange={(e) => setDraft((d) => ({ ...d, time: e.target.value }))}
+                    className="rounded-[10px] border border-[#0F3D2E]/15 bg-white px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none"
+                  />
+                </div>
+                <select
+                  value={draft.scope}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, scope: e.target.value as CalEvent['scope'] }))
+                  }
+                  className="w-full rounded-[10px] border border-[#0F3D2E]/15 bg-white px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none"
+                >
+                  <option value="company">Entire company</option>
+                  <option value="team">Team</option>
+                  <option value="executive">Executive</option>
+                  <option value="individual">Selective employee</option>
+                </select>
+                {draft.scope === 'individual' ? (
+                  <input
+                    value={draft.assigneeEmail}
+                    onChange={(e) => setDraft((d) => ({ ...d, assigneeEmail: e.target.value }))}
+                    placeholder="Employee email"
+                    className="w-full rounded-[10px] border border-[#0F3D2E]/15 bg-white px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none"
+                  />
+                ) : null}
+                <label className="flex items-center gap-2 font-sans text-[0.75rem] text-[#0F3D2E]">
+                  <input
+                    type="checkbox"
+                    checked={draft.syncToOffice}
+                    onChange={(e) => setDraft((d) => ({ ...d, syncToOffice: e.target.checked }))}
+                  />
+                  Sync to Office subdomain
+                </label>
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(false)}
+                  className="rounded-[8px] border-0 bg-transparent px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#55655D]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saving || !draft.title.trim() || (draft.scope === 'individual' && !draft.assigneeEmail.trim())}
+                  onClick={() => void saveEvent()}
+                  className="rounded-[8px] border-0 bg-[#0F3D2E] px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#E8DFD6] disabled:opacity-45"
+                >
+                  {saving ? 'Saving…' : 'Create event'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   )
 }
@@ -2910,6 +4921,14 @@ function FilesWorkspace({
   ]
 
   const activePath = folders.find((f) => f.id === folder)?.path ?? '/Applications'
+  const [page, setPage] = useState(0)
+  const FILES_PAGE = 20
+  const filePages = Math.max(1, Math.ceil(rows.length / FILES_PAGE))
+  const pagedRows = rows.slice(page * FILES_PAGE, page * FILES_PAGE + FILES_PAGE)
+
+  useEffect(() => {
+    setPage(0)
+  }, [folder, query, rows.length])
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F7F3EE]">
@@ -2960,7 +4979,7 @@ function FilesWorkspace({
         </aside>
 
         {/* File list */}
-        <section className="min-h-0 overflow-hidden border-b border-[#0F3D2E]/08 lg:border-b-0 lg:border-r-0">
+        <section className="flex min-h-0 flex-col overflow-hidden border-b border-[#0F3D2E]/08 lg:border-b-0 lg:border-r-0">
           {rows.length === 0 ? (
             <div className="flex h-full items-center justify-center p-4">
               <p className="m-0 text-center font-sans text-[0.8125rem] text-[#55655D]">
@@ -2970,44 +4989,69 @@ function FilesWorkspace({
               </p>
             </div>
           ) : (
-            <ul className="h-full space-y-2 overflow-y-auto p-2">
-              {rows.map((a) => {
-                const active = selected?.id === a.id
-                return (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(a.id)}
-                      className={`flex w-full items-start gap-2.5 rounded-[14px] border-0 px-3 py-2.5 text-left shadow-none outline-none transition ${
-                        active
-                          ? 'bg-[#C9B396]'
-                          : 'bg-[#E8DFD6] hover:bg-[#E0D6CA]'
-                      }`}
-                    >
-                      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#0F3D2E]/10 font-sans text-[0.625rem] font-bold text-[#0F3D2E]">
-                        {isMedicareApplication(a) ? 'MR' : isAcaApplication(a) ? 'ACA' : 'APP'}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
-                            {a.first_name} {a.last_name}
+            <>
+              <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+                {pagedRows.map((a) => {
+                  const active = selected?.id === a.id
+                  return (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(a.id)}
+                        className={`flex w-full items-start gap-2.5 rounded-[14px] border-0 px-3 py-2.5 text-left shadow-none outline-none transition ${
+                          active
+                            ? 'bg-[#C9B396]'
+                            : 'bg-[#E8DFD6] hover:bg-[#E0D6CA]'
+                        }`}
+                      >
+                        <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#0F3D2E]/10 font-sans text-[0.625rem] font-bold text-[#0F3D2E]">
+                          {isMedicareApplication(a) ? 'MR' : isAcaApplication(a) ? 'ACA' : 'APP'}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">
+                              {a.first_name} {a.last_name}
+                            </span>
+                            {statusBadge(a.application_status)}
                           </span>
-                          {statusBadge(a.application_status)}
+                          <span className="mt-0.5 block truncate font-sans text-[0.6875rem] text-[#55655D]">
+                            {sourceLabel(a)}
+                            {a.plan_type ? ` · ${a.plan_type}` : ''}
+                            {a.state ? ` · ${a.state}` : ''}
+                          </span>
+                          <span className="mt-0.5 block font-sans text-[0.625rem] text-[#55655D]/80">
+                            {fmtShort(a.created_at)}
+                          </span>
                         </span>
-                        <span className="mt-0.5 block truncate font-sans text-[0.6875rem] text-[#55655D]">
-                          {sourceLabel(a)}
-                          {a.plan_type ? ` · ${a.plan_type}` : ''}
-                          {a.state ? ` · ${a.state}` : ''}
-                        </span>
-                        <span className="mt-0.5 block font-sans text-[0.625rem] text-[#55655D]/80">
-                          {fmtShort(a.created_at)}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+              <div className="flex shrink-0 items-center justify-between border-t border-[#0F3D2E]/08 px-2 py-1.5">
+                <span className="font-sans text-[0.625rem] font-semibold text-[#55655D]">
+                  {page + 1} / {filePages}
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    disabled={page <= 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    className="rounded-[8px] border-0 bg-[#E8DFD6] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] disabled:opacity-40"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= filePages - 1}
+                    onClick={() => setPage((p) => Math.min(filePages - 1, p + 1))}
+                    className="rounded-[8px] border-0 bg-[#E8DFD6] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E] disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </section>
 
@@ -3228,6 +5272,7 @@ function ApplicationDetail({
  * ------------------------------------------------------------------------- */
 
 function EmployeesWorkspace({
+  applications,
   careers,
   listings,
   hiringStats,
@@ -3235,6 +5280,7 @@ function EmployeesWorkspace({
   onListingsChange,
   onFlash,
 }: {
+  applications: Application[]
   careers: Career[]
   listings: CareerListingRow[]
   hiringStats: Record<string, number>
@@ -3242,7 +5288,7 @@ function EmployeesWorkspace({
   onListingsChange: (rows: CareerListingRow[]) => void
   onFlash: (msg: string | null) => void
 }) {
-  const [view, setView] = useState<WorkforceView>('directory')
+  const [view, setView] = useState<WorkforceView>('command')
   const [profileQuery, setProfileQuery] = useState('')
 
   const profiles = useMemo(() => {
@@ -3267,77 +5313,22 @@ function EmployeesWorkspace({
   }, [careers, profileQuery])
 
   return (
-    <div className="space-y-4">
-      <div className={cardClass}>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-              Workforce
-            </p>
-            <h2 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.35rem' }}>
-              Hiring pulse
-            </h2>
-          </div>
-          <input
-            value={profileQuery}
-            onChange={(e) => {
-              setProfileQuery(e.target.value)
-              setView('directory')
-            }}
-            placeholder="Search employee profiles…"
-            className="w-full max-w-sm rounded-[12px] border border-[#0F3D2E]/15 bg-[#F7F3EE] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-72"
-          />
-        </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: 'Pipeline', value: careers.length },
-            { label: 'New', value: hiringStats.new ?? 0 },
-            { label: 'Interview+', value: (hiringStats.interview ?? 0) + (hiringStats.offer ?? 0) },
-            { label: 'Hired', value: hiringStats.hired ?? 0 },
-          ].map((s) => (
-            <div key={s.label} className="rounded-[14px] bg-[#FAFCFB] px-3 py-3">
-              <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
-                {s.label}
-              </p>
-              <p className="m-0 mt-1 font-sans text-[1.6rem] font-semibold text-[#0F3D2E]">
-                {s.value}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-5">
-          <p className="mb-2 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
-            Application stages
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {CAREER_STATUSES.map((s) => (
-              <span
-                key={s}
-                className="inline-flex items-center gap-2 rounded-full bg-[#F4F1EC] px-3 py-1.5 font-sans text-[0.75rem] text-[#0F3D2E]"
-              >
-                {s.replace(/_/g, ' ')}
-                <strong>{hiringStats[s] ?? 0}</strong>
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex shrink-0 flex-wrap gap-1.5">
         {(
           [
+            { id: 'command' as const, label: 'Command' },
             { id: 'directory' as const, label: 'Profiles' },
             { id: 'hiring' as const, label: 'Applications' },
-            { id: 'job-board' as const, label: 'Hire' },
+            { id: 'job-board' as const, label: 'Recruitment' },
+            { id: 'contracting' as const, label: 'Contracting' },
           ] as const
         ).map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setView(t.id)}
-            className={`rounded-full px-4 py-2 font-sans text-[0.8125rem] font-semibold transition ${
+            className={`rounded-full px-3 py-1.5 font-sans text-[0.75rem] font-semibold transition ${
               view === t.id
                 ? 'bg-[#0F3D2E] text-white'
                 : 'bg-[#E8DFD6] text-[#0F3D2E] hover:bg-[#E0D6CA]'
@@ -3348,232 +5339,130 @@ function EmployeesWorkspace({
         ))}
       </div>
 
-      {view === 'directory' && (
-        <div className="space-y-3">
-          {profiles.length === 0 ? (
-            <div className={cardClass}>
-              <p className="m-0 font-sans text-[0.875rem] text-[#55655D]">
-                {profileQuery.trim()
-                  ? 'No employee profiles match that search.'
-                  : 'No employee profiles yet. Career applications appear here as people apply.'}
-              </p>
-            </div>
-          ) : (
-            profiles.map((c) => (
-              <div key={c.id} className={cardClass}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="m-0 font-sans text-[0.9375rem] font-semibold text-[#0F3D2E]">
-                        {c.first_name} {c.last_name}
-                      </p>
-                      {statusBadge(c.status)}
-                      <span className="inline-flex rounded-full bg-[#0F3D2E]/[0.06] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E]">
-                        {c.position}
-                      </span>
-                    </div>
-                    <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
-                      {c.email}
-                      {c.phone ? ` · ${c.phone}` : ''}
-                      {c.location ? ` · ${c.location}` : ''}
+      {view === 'command' ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <WorkforceDashboard
+            applications={applications}
+            careers={careers}
+            listings={listings}
+          />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+          {view === 'directory' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
+                    Profiles
+                  </p>
+                  <p className="m-0 mt-0.5 font-sans text-[0.8125rem] text-[#55655D]">
+                    Career applicants and hired workforce records
+                  </p>
+                </div>
+                <input
+                  value={profileQuery}
+                  onChange={(e) => setProfileQuery(e.target.value)}
+                  placeholder="Search employee profiles…"
+                  className="w-full max-w-sm rounded-[12px] border border-[#0F3D2E]/15 bg-[#F7F3EE] px-3 py-2 font-sans text-[0.8125rem] text-[#0F3D2E] outline-none focus:border-[#0F3D2E] sm:w-72"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { label: 'Pipeline', value: careers.length },
+                  { label: 'New', value: hiringStats.new ?? 0 },
+                  { label: 'Interview+', value: (hiringStats.interview ?? 0) + (hiringStats.offer ?? 0) },
+                  { label: 'Hired', value: hiringStats.hired ?? 0 },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-[14px] border border-[#0F3D2E]/08 bg-[#FAFCFB] px-3 py-3">
+                    <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-[#55655D]">
+                      {s.label}
                     </p>
-                    <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#55655D]/80">
-                      Applied {fmtDate(c.created_at)}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-3">
-                      {c.linkedin_url ? (
-                        <a
-                          href={c.linkedin_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
-                        >
-                          LinkedIn
-                        </a>
-                      ) : null}
-                      {c.portfolio_url ? (
-                        <a
-                          href={c.portfolio_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
-                        >
-                          Portfolio / Resume
-                        </a>
-                      ) : null}
+                    <p className="m-0 mt-1 font-sans text-[1.4rem] font-semibold text-[#0F3D2E]">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+              {profiles.length === 0 ? (
+                <div className={cardClass}>
+                  <p className="m-0 font-sans text-[0.875rem] text-[#55655D]">
+                    {profileQuery.trim()
+                      ? 'No employee profiles match that search.'
+                      : 'No employee profiles yet. Career applications appear here as people apply.'}
+                  </p>
+                </div>
+              ) : (
+                profiles.map((c) => (
+                  <div key={c.id} className={cardClass}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="m-0 font-sans text-[0.9375rem] font-semibold text-[#0F3D2E]">
+                            {c.first_name} {c.last_name}
+                          </p>
+                          {statusBadge(c.status)}
+                          <span className="inline-flex rounded-full bg-[#0F3D2E]/[0.06] px-2.5 py-1 font-sans text-[0.6875rem] font-semibold text-[#0F3D2E]">
+                            {c.position}
+                          </span>
+                        </div>
+                        <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
+                          {c.email}
+                          {c.phone ? ` · ${c.phone}` : ''}
+                          {c.location ? ` · ${c.location}` : ''}
+                        </p>
+                        <p className="m-0 mt-0.5 font-sans text-[0.75rem] text-[#55655D]/80">
+                          Applied {fmtDate(c.created_at)}
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-3">
+                          {c.linkedin_url ? (
+                            <a
+                              href={c.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
+                            >
+                              LinkedIn
+                            </a>
+                          ) : null}
+                          {c.portfolio_url ? (
+                            <a
+                              href={c.portfolio_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E] underline"
+                            >
+                              Portfolio / Resume
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                      <select
+                        value={c.status}
+                        onChange={(e) => void onUpdateCareer(c.id, e.target.value)}
+                        className={selectClass}
+                      >
+                        {CAREER_STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {s.replace(/_/g, ' ')}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                  <select
-                    value={c.status}
-                    onChange={(e) => void onUpdateCareer(c.id, e.target.value)}
-                    className={selectClass}
-                  >
-                    {CAREER_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            ))
+                ))
+              )}
+            </>
           )}
-        </div>
-      )}
 
-      {view === 'hiring' && <CareersTable rows={careers} onUpdateStatus={onUpdateCareer} />}
-      {view === 'job-board' && (
-        <JobBoardEditor rows={listings} onChange={onListingsChange} onFlash={onFlash} />
+          {view === 'hiring' && <CareersTable rows={careers} onUpdateStatus={onUpdateCareer} />}
+          {view === 'job-board' && (
+            <JobBoardEditor rows={listings} onChange={onListingsChange} onFlash={onFlash} />
+          )}
+          {view === 'contracting' && <ContractingPanel />}
+        </div>
       )}
     </div>
   )
 }
-
-function SalesMarketingPanel({
-  sales,
-  counts,
-  acaCount,
-  medicareCount,
-  enrolledCount,
-}: {
-  sales: {
-    bySource: Record<string, number>
-    byStatus: Record<string, number>
-    byState: Record<string, number>
-    last7: number
-    conversion: number
-    enrolled: number
-  }
-  counts: Record<FileFolderId, number>
-  acaCount: number
-  medicareCount: number
-  enrolledCount: number
-}) {
-  const topStates = Object.entries(sales.byState)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-  const total = Object.values(sales.bySource).reduce((a, b) => a + b, 0)
-
-  const miniStats = [
-    { label: 'All', value: counts.all, sub: `${sales.last7} / 7d` },
-    { label: 'ACA', value: acaCount, sub: 'Marketplace' },
-    { label: 'Medicare', value: medicareCount, sub: 'Reviews' },
-    { label: 'Active', value: enrolledCount, sub: `${sales.conversion}%` },
-  ]
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {miniStats.map((s) => (
-          <div
-            key={s.label}
-            className="min-w-[5.5rem] flex-1 rounded-[12px] bg-[#E8DFD6] px-3 py-2.5 sm:flex-none"
-          >
-            <p className="m-0 font-sans text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-[#55655D]">
-              {s.label}
-            </p>
-            <p className="m-0 mt-0.5 font-sans text-[1.25rem] font-semibold leading-tight text-[#0F3D2E]">
-              {s.value}
-            </p>
-            <p className="m-0 truncate font-sans text-[0.625rem] text-[#55655D]">{s.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className={`${cardClass} lg:col-span-2`}>
-        <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-          Marketing attribution
-        </p>
-        <h2 className="m-0 mt-1 font-medium text-[#0F3D2E]" style={{ ...displayFont, fontSize: '1.35rem' }}>
-          Application sources
-        </h2>
-        <p className="m-0 mt-2 font-sans text-[0.875rem] text-[#55655D]">
-          Live mix from ACA enroll, Medicare.Reviews, and untagged intake — the same funnel
-          agents work on the Office floor.
-        </p>
-        <div className="mt-5 space-y-3">
-          {Object.entries(sales.bySource)
-            .sort((a, b) => b[1] - a[1])
-            .map(([src, n]) => {
-              const pct = total ? Math.round((n / total) * 100) : 0
-              return (
-                <div key={src}>
-                  <div className="mb-1 flex justify-between font-sans text-[0.8125rem]">
-                    <span className="font-semibold text-[#0F3D2E]">{src}</span>
-                    <span className="text-[#55655D]">
-                      {n} apps · {pct}%
-                    </span>
-                  </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-[#0F3D2E]/10">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#0F3D2E,#C9A961)]"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          {total === 0 ? (
-            <p className="m-0 font-sans text-[0.875rem] text-[#55655D]">No source data yet.</p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className={cardClass}>
-          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
-            Conversion
-          </p>
-          <p className="m-0 mt-2 font-sans text-[2.2rem] font-semibold text-[#0F3D2E]">
-            {sales.conversion}%
-          </p>
-          <p className="m-0 mt-1 font-sans text-[0.8125rem] text-[#55655D]">
-            {sales.enrolled} enrolled / approved of total intake
-          </p>
-        </div>
-        <div className={cardClass}>
-          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
-            Top states
-          </p>
-          <ul className="m-0 mt-3 list-none space-y-2 p-0">
-            {topStates.length === 0 ? (
-              <li className="font-sans text-[0.8125rem] text-[#55655D]">No state data yet.</li>
-            ) : (
-              topStates.map(([st, n]) => (
-                <li
-                  key={st}
-                  className="flex items-center justify-between font-sans text-[0.8125rem] text-[#0F3D2E]"
-                >
-                  <span className="font-semibold">{st}</span>
-                  <span className="text-[#55655D]">{n}</span>
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-        <div className={cardClass}>
-          <p className="m-0 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-[#55655D]">
-            Pipeline status
-          </p>
-          <div className="mt-3 space-y-2">
-            {Object.entries(sales.byStatus).map(([st, n]) => (
-              <div key={st} className="flex items-center justify-between gap-2">
-                {statusBadge(st)}
-                <span className="font-sans text-[0.8125rem] font-semibold text-[#0F3D2E]">{n}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
-  )
-}
-
-/* ---------------------------------------------------------------------------
- * Shared tables / editors (preserved)
- * ------------------------------------------------------------------------- */
 
 function CareersTable({
   rows,
@@ -3718,6 +5607,16 @@ function JobBoardEditor({
   const [draft, setDraft] = useState({ ...EMPTY_LISTING })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 4
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const pageSafe = Math.min(page, pageCount)
+  const pageRows = rows.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE)
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   const startEdit = (row: CareerListingRow) => {
     setEditingId(row.id)
@@ -3786,12 +5685,12 @@ function JobBoardEditor({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <div className={cardClass}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="m-0 font-sans text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-[#C9A961]">
-              Hire editor
+              Recruitment editor
             </p>
             <h2
               className="m-0 mt-1 font-medium text-[#0F3D2E]"
@@ -3903,13 +5802,15 @@ function JobBoardEditor({
         </button>
       </div>
 
-      <div className="space-y-3">
+      <div className="flex min-h-0 flex-col gap-3">
         {rows.length === 0 ? (
-          <p className="font-sans text-[0.9375rem] text-[#55655D]">
-            No job listings yet. Add one above — it will appear on the public careers page.
-          </p>
+          <div className={cardClass}>
+            <p className="m-0 font-sans text-[0.9375rem] text-[#55655D]">
+              No job listings yet. Add one in the editor — it will appear on the public careers page.
+            </p>
+          </div>
         ) : (
-          rows.map((row) => (
+          pageRows.map((row) => (
             <div key={row.id} className={cardClass}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -3956,6 +5857,32 @@ function JobBoardEditor({
             </div>
           ))
         )}
+
+        {rows.length > PAGE_SIZE ? (
+          <div className="flex items-center justify-between gap-2 px-1">
+            <p className="m-0 font-sans text-[0.75rem] text-[#55655D]">
+              Page {pageSafe} of {pageCount} · {rows.length} listings
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={pageSafe <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-[8px] border border-[#0F3D2E]/20 px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#0F3D2E] disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={pageSafe >= pageCount}
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                className="rounded-[8px] border border-[#0F3D2E]/20 px-3 py-1.5 font-sans text-[0.75rem] font-semibold text-[#0F3D2E] disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )

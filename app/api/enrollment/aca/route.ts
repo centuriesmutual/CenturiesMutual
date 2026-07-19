@@ -10,6 +10,7 @@ import {
   isACASpecialEnrollmentEnabled,
 } from '@/lib/aca/enrollment-flags'
 import { getAcaStateFlag, isStateAvailable } from '@/lib/aca/state-flags'
+import { ensureApplicationConversation } from '@/lib/conversations/server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -191,6 +192,13 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return jsonError(error.message, 500)
+
+  if (data?.id) {
+    await ensureApplicationConversation({
+      applicationId: data.id,
+      systemMessage: 'Application submitted',
+    })
+  }
 
   await supabase.from('aca_enrollment_rate_limits').insert({
     fingerprint,
