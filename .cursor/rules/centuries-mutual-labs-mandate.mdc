@@ -1,0 +1,32 @@
+---
+description: Centuries Mutual Labs quant research platform mandate and boundaries
+alwaysApply: true
+---
+
+# Centuries Mutual Labs Mandate
+
+This repository is the Centuries Mutual Labs research, quantitative analysis, AI, and market intelligence laboratory. It is NOT a website, insurance CRM, or production application. Production apps live in GitLab.
+
+## Build
+
+- Market/economic regime detection, forecasting, healthcare/insurance intelligence
+- Feature engineering, statistical/risk modeling, signals, backtesting, ML/RL/NLP
+- Structured APIs and event bus for downstream consumers
+
+## Architecture
+
+- Keep modules independent (`ingestion`, `features`, `models`, `backtests`, `strategies`, `api`, `sdk`, `events`)
+- Prefer dependency injection and composition; avoid tight coupling
+- Models implement shared protocols (`RegimeModel`, `SignalModel`, `ForecastModel`, etc.)
+- All engineered features live in the single feature store—never duplicate calculations
+- Predictive models must be backtested (Sharpe, Sortino, drawdown, classification metrics, OOS, walk-forward)
+- Notebooks are experimental only; promote validated work into modules
+- APIs return structured JSON; never couple APIs to UI
+
+## Forbidden in this repo
+
+Do not build: authentication, user management, insurance CRM, marketing pages, website layouts, frontend dashboards, customer portals, or business CRUD.
+
+## Engineering
+
+Prefer readability, correctness, determinism, reproducibility, modularity, testability. No secrets in git—use environment variables. Version models independently (data, params, metrics, features).

@@ -1,150 +1,105 @@
-# Centuries Mutual — Corporate Web Platform
+# Centuries Mutual Labs — Quantitative Research Platform
 
-**Repository:** Private — Authorized personnel only
+Official research, quantitative analysis, AI, and market intelligence laboratory for **Centuries Mutual Labs**.
 
-Centuries Mutual is a **Next.js 14 (App Router)** web application written in **TypeScript** that supports the firm's digital presence: community brokerage positioning, structured product education, trust-centric experiences, document workflows, and client-facing tooling.
+This repository is **not** a website, insurance CRM, or production application. Production applications live in GitLab. This lab discovers, prototypes, validates, backtests, and serves structured intelligence through stable APIs and events.
 
-This README is maintained for **technical due diligence**, **vendor onboarding**, and **internal governance** ("bank-ready": accurate, sober, audit-friendly—not marketing copy).
+See [docs/MANDATE.md](docs/MANDATE.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
----
+## Capabilities
 
-## 1. Executive summary
+- Market and economic regime detection
+- Feature engineering (single feature store)
+- Forecasting, risk, NLP / sentiment research
+- Healthcare and insurance intelligence research
+- Backtesting (Sharpe, Sortino, drawdown, classification metrics, OOS, walk-forward)
+- Structured JSON API and event schemas for downstream consumers
 
-| Item | Detail |
-|------|--------|
-| **Purpose** | Public and authenticated web experiences for Centuries Mutual; marketing, disclosures, integrations, and operational UI |
-| **Language** | TypeScript (strict, with relaxed `noImplicitAny` for incremental migration) |
-| **Runtime** | Node.js (LTS recommended), React 18, Next.js 14 App Router |
-| **Primary hosting model** | Static + server-rendered routes, deployed on **[Vercel](https://vercel.com)** with environment-based configuration |
+## Layout
 
----
+| Path | Role |
+|------|------|
+| `docs/` | Mandate, architecture, validation standards |
+| `notebooks/` | Experimental only — not production |
+| `research/` | Writeups and literature notes |
+| `data/` | `raw` / `processed` / `reference` |
+| `ingestion/` | Deterministic loaders |
+| `features/` | Shared feature store |
+| `models/` | Protocol-based models (`regime`, `signals`, `forecasting`, `risk`, `nlp`) |
+| `backtests/` | Metrics and walk-forward harness |
+| `strategies/` | Signal → position rules |
+| `events/` | Intelligence event schemas + publisher |
+| `api/` | FastAPI JSON endpoints |
+| `sdk/` | Thin Python client |
+| `scripts/` | Reproducible CLI jobs |
+| `tests/` | Deterministic unit and API contract tests |
+| `config/` | Non-secret settings |
 
-## 2. Capability overview (high level)
+## Setup
 
-- **Marketing & informational pages:** Services, landlord/tenant/host/trust narratives, downloads, equity and learning content
-- **Identity & sessions:** Authentication via **Auth0** (`@auth0/nextjs-auth0`); the `/login` and `/signup` pages hand off to Auth0 Universal Login through the `/api/auth/[...auth0]` route handler
-- **Operational UI:** Claims, disputes, enrollment, security narratives, audits, utilities, messaging, AI/technology exposition
-- **Documents & signatures:** Digital document flows with PDF generation tooling (`jspdf`, `pdfkit`) and signing components (`signature_pad`, `react-signature-canvas`)
-- **Search:** Meilisearch client available where search-backed features are deployed
-- **Asset storage / content:** Box SDK (`box-node-sdk`) supports enterprise content workflows for application and enrollment uploads
-
-> **Disclaimer:** Capability descriptions describe **technical affordances** in this codebase. Regulatory status, licensing, and product approvals are governed by Centuries Mutual policies and applicable law—not by this README.
-
----
-
-## 3. Technology stack
-
-| Layer | Technology |
-|-------|-------------|
-| **Language** | TypeScript 5 |
-| **Framework** | Next.js 14, React 18 |
-| **Styling / UI** | Bootstrap 5, Bootstrap Icons, Tailwind CSS (`tailwind.config.ts`), Framer Motion |
-| **Auth** | Auth0 (`@auth0/nextjs-auth0`) |
-| **Analytics** | Vercel Analytics (`@vercel/analytics`) |
-| **3D / visualization** | Three.js, React Three Fiber, Drei (select experiences) |
-
----
-
-## 4. Prerequisites
-
-- **Node.js** 18.x or 20.x (LTS)
-- **npm** (bundled with Node)
-
-Optional integrations require separate accounts and secrets (Auth0 tenant, Box, Meilisearch, etc.) provisioned according to enterprise policy.
-
----
-
-## 5. Local development
-
-Clone the repository (authorized credentials only):
+Python **3.11+** required.
 
 ```bash
-git clone https://github.com/centuriesmutual/CenturiesMutual.git
-cd CenturiesMutual
-npm install
+python -m venv .venv
+# Windows
+.\.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
+pip install -U pip
+pip install -e ".[dev]"
+cp .env.example .env
 ```
 
-### Environment variables
-
-Secrets **must never** be committed. Create `.env.local` (ignored by Git) for local development:
-
-| Variable | Role |
-|---------|------|
-| `AUTH0_SECRET` | Long random string used to encrypt the session cookie |
-| `AUTH0_BASE_URL` | Application base URL (e.g. `http://localhost:3030` locally, `https://centuriesmutual.com` in prod) |
-| `AUTH0_ISSUER_BASE_URL` | Auth0 tenant URL (e.g. `https://your-tenant.us.auth0.com`) |
-| `AUTH0_CLIENT_ID` | Auth0 application client ID |
-| `AUTH0_CLIENT_SECRET` | Auth0 application client secret |
-
-Additional variables apply per feature (Box, Meilisearch, etc.); coordinate with engineering for the authoritative checklist for your deployment environment.
-
-### Commands
+## Tests
 
 ```bash
-npm run dev        # Development server — port 3030 (per package.json)
-npm run build      # Production build verification
-npm run start      # Production server (port 3000 after build)
-npm run lint       # ESLint — Next.js
-npm run typecheck  # TypeScript strict typecheck
+pytest
 ```
 
-Resolve `npm run build` and `npm run typecheck` warnings before tagging releases promoted to staging or production.
+## API
 
----
-
-## 6. Repository layout (abbreviated)
-
-```
-app/              # Routes (App Router), layouts, metadata, API routes — TypeScript
-components/       # React components (TSX) — UI sections, dashboards, Navbar, Footer, etc.
-hooks/            # Reusable React hooks (TS)
-lib/              # Shared utilities (e.g. Auth0 handler) — TS
-utils/            # Animation primitives and other utilities — TS
-public/           # Static assets (images, favicon)
+```bash
+uvicorn api.main:app --host 127.0.0.1 --port 8080
 ```
 
----
+Example endpoints:
 
-## 7. Security & compliance posture (documentation)
+- `GET /api/regime/current`
+- `GET /api/regime/history`
+- `GET /api/signals`
+- `GET /api/features`
+- `GET /api/forecast`
+- `GET /api/research`
+- `GET /api/risk`
+- `GET /api/healthcare`
+- `GET /api/economy`
+- `GET /api/insurance`
 
-This section documents **engineering expectations** consistent with regulated environments:
+## Reference regime path
 
-| Topic | Guidance |
-|--------|----------|
-| **Secrets** | Store only in environment variables or approved secret managers |
-| **Transport** | Enforce HTTPS in production; TLS termination at hosting edge |
-| **Dependencies** | Run `npm audit` and remediation on a recurring cadence; pin critical upgrades outside patch releases |
-| **PII / payments** | No cardholder data (PCI) belongs in frontend env vars or this repo |
-| **Access** | Principle of least privilege for Git ownership, CI keys, Auth0 tenant administration |
+1. Features from `features.build_default_store()`
+2. `models.regime.ThresholdRegimeModel`
+3. Backtest via `scripts/run_regime_backtest.py` or `backtests.run_walk_forward_classification`
+4. Served at `/api/regime/*` with `RegimeChanged` events
 
----
+```bash
+python scripts/run_regime_backtest.py
+```
 
-## 8. Operational ownership
+## Promotion path (notebook → production module)
 
-| Role | Responsibility |
-|------|----------------|
-| **Product / business** | Content accuracy of public disclosures |
-| **Engineering** | Releases, branching, CVE response, infra alignment |
-| **Security / Risk** | Sign-off for third-party integrations and data classification |
+1. Prototype in `notebooks/`
+2. Move feature logic into `features/` (never duplicate)
+3. Implement model under `models/<domain>/` behind a shared protocol
+4. Add deterministic tests and a backtest report
+5. Expose via `api/` and emit events
+6. Record version metadata (training data, parameters, metrics, feature versions)
 
-Support and escalation contacts are internal to Centuries Mutual and are **not** published in this README.
+## Boundaries
 
----
+Do **not** add authentication, user management, CRM pages, marketing sites, dashboards, customer portals, or business CRUD here. Those belong exclusively in GitLab.
 
-## 9. License & confidentiality
+## Security
 
-Unless a separate **`LICENSE`** file states otherwise:
-**© Centuries Mutual. All rights reserved.**
-
-Unlicensed redistribution, cloning for external publication, or use outside authorized employment or contractor engagements is prohibited.
-
----
-
-## 10. Document control
-
-| Version | Date | Notes |
-|---------|------|-------|
-| 1.0 | 2026-04 | Initial institutional README |
-| 1.1 | 2026-04 | Migrated to TypeScript; Auth0 used as the sole identity provider |
-
-*Maintained by Centuries Mutual engineering.*
+Never commit secrets. Use environment variables (see `.env.example`).

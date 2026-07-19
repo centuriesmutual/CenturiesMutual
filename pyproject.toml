@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "centuries-mutual-labs"
+version = "0.1.0"
+description = "Centuries Mutual Labs quantitative research and intelligence laboratory"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Centuries Mutual Labs" }]
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "scipy>=1.11",
+  "scikit-learn>=1.3",
+  "pydantic>=2.5",
+  "pydantic-settings>=2.1",
+  "fastapi>=0.109",
+  "uvicorn[standard]>=0.27",
+  "httpx>=0.26",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+  "ruff>=0.1",
+  "jupyter>=1.0",
+  "ipykernel>=6.27",
+]
+
+[project.scripts]
+centuries-mutual-labs-api = "api.main:run"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+  "centuries_mutual_labs*",
+  "api*",
+  "ingestion*",
+  "features*",
+  "models*",
+  "backtests*",
+  "strategies*",
+  "events*",
+  "sdk*",
+  "config*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
